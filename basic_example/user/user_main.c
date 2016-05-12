@@ -16,27 +16,56 @@ uint8 original_mac_addr [MAC_SIZE] = {0, 0, 0, 0, 0, 0};
 uint8 new_mac_addr[MAC_SIZE] = {0x00, 0x11, 0x22, 0x33, 0x44, 0x55};
 
 const uint8 DST_IP[4] = {87, 106, 138, 10};
-const uint16 DST_PORT = 3334;
+const uint16 DST_PORT = 3333;
 
 struct espconn conn;
 esp_udp udp;
 
 void ICACHE_FLASH_ATTR
 send_datagram() {
+    char *payload = "hallo";
     conn.type = ESPCONN_UDP;
     conn.state = ESPCONN_NONE;
     conn.proto.udp = &udp;
     IP4_ADDR((ip_addr_t *)conn.proto.udp->remote_ip, DST_IP[0], DST_IP[1], DST_IP[2], DST_IP[3]);
     conn.proto.udp->remote_port = DST_PORT;
-    espconn_create(&conn);
-    char *payload = "hallo";
-    espconn_send(&conn, payload, strlen(payload));
+    switch(espconn_create(&conn)) {
+        case ESPCONN_ARG:
+            {
+                os_printf("_create: invalid argument\n");
+                break;
+            }
+        case ESPCONN_ISCONN:
+            {
+                os_printf("_create: already connected\n");
+                break;
+            }
+        case ESPCONN_MEM:
+            {
+                os_printf("_create: out of memory\n");
+                break;
+            }
+    }
+
+    switch(espconn_send(&conn, payload, strlen(payload))) {
+        case ESPCONN_ARG:
+            {
+                os_printf("_send: invalid argument\n");
+                break;
+            }
+        case ESPCONN_MEM:
+            {
+                os_printf("_send: OoM\n");
+                break;
+            }
+    }
     espconn_delete(&conn);
 }
 
 // wifi: ESP has two "interfaces": one when acting as a station and another when it's acting as an AP
 void ICACHE_FLASH_ATTR
 print_mac(uint8 *mac) {
+    int i;
     memset(mac, 0, MAC_SIZE);
     if (wifi_get_macaddr(STATION_IF, mac) != true) {
         os_printf("Failed to get the new MAC address\n");
@@ -50,10 +79,6 @@ print_mac(uint8 *mac) {
 void ICACHE_FLASH_ATTR
 wifi_callback( System_Event_t *evt ) {
     os_printf("Got an event!\n");
-    if (*evt == NULL) {
-        os_printf("received invalid event.\n");
-        return;
-    }
     switch (evt->event) {
         case EVENT_STAMODE_CONNECTED:
             {
