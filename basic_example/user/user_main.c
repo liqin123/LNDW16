@@ -22,6 +22,7 @@ esp_udp udp;
 os_timer_t my_timer;
 
 void mac_to_str(char *buf, uint8 mac[]) {
+    memset(buf, 0, 20);
     int i=0;
     char tmp[5];
     for (i=0; i < MAC_SIZE; ++i) {
@@ -33,7 +34,6 @@ void mac_to_str(char *buf, uint8 mac[]) {
 void ICACHE_FLASH_ATTR
 get_mac(char *buf) {
     uint8 mac[6];
-    memset(buf, 0, 20);
     if (wifi_get_macaddr(STATION_IF, mac) != true) {
         os_printf("Failed to get the new MAC address\n");
     }   
