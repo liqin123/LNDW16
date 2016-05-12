@@ -5,4 +5,4 @@
 5. Connect the UART adapter to your PC
 6. Keep the right button (the one with the white wire to ground) pressed, shortly press the left one
 7. Run "make flash"
-8. Run "screen /dev/<serial dev> 115200"
+8. Run "screen yourserialdevice 115200"
