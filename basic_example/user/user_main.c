@@ -21,9 +21,29 @@ esp_udp udp;
 
 os_timer_t my_timer;
 
+void mac_to_str(char *buf, uint8 mac[]) {
+    int i=0;
+    char tmp[5];
+    for (i=0; i < MAC_SIZE; ++i) {
+        os_sprintf(tmp, "%x", mac[i]);
+        strncat(buf, tmp, 4);
+    }   
+}
+// wifi: ESP has two "interfaces": one when acting as a station and another when it's acting as an AP
+void ICACHE_FLASH_ATTR
+get_mac(char *buf) {
+    uint8 mac[6];
+    memset(buf, 0, 20);
+    if (wifi_get_macaddr(STATION_IF, mac) != true) {
+        os_printf("Failed to get the new MAC address\n");
+    }   
+    mac_to_str(buf, mac);
+}
+
 void ICACHE_FLASH_ATTR
 send_datagram() {
-    char *payload = "hallo";
+    char payload[20];
+    mac_to_str(payload, original_mac_addr);
     conn.type = ESPCONN_UDP;
     conn.state = ESPCONN_NONE;
     conn.proto.udp = &udp;
@@ -77,20 +97,6 @@ loop(os_event_t *events)
     system_os_post(user_procTaskPrio, 0, 0 );
 }
 
-// wifi: ESP has two "interfaces": one when acting as a station and another when it's acting as an AP
-void ICACHE_FLASH_ATTR
-print_mac(uint8 *mac) {
-    int i;
-    memset(mac, 0, MAC_SIZE);
-    if (wifi_get_macaddr(STATION_IF, mac) != true) {
-        os_printf("Failed to get the new MAC address\n");
-    }   
-    os_printf("\n New MAC: ");
-    for (i=0; i < MAC_SIZE; ++i) {
-        os_printf("%x", mac[i]);
-    }   
-
-}
 void ICACHE_FLASH_ATTR
 wifi_callback( System_Event_t *evt ) {
     os_printf("Got an event!\n");
@@ -100,7 +106,6 @@ wifi_callback( System_Event_t *evt ) {
                 os_printf("connect to ssid %s, channel %d\n",
                         evt->event_info.connected.ssid,
                         evt->event_info.connected.channel);
-                print_mac(new_mac_addr);
                 break;
             }
         case EVENT_STAMODE_DISCONNECTED:
