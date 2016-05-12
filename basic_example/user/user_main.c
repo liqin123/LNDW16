@@ -8,8 +8,6 @@
 
 #define user_procTaskPrio        0
 #define user_procTaskQueueLen    1
-os_event_t    user_procTaskQueue[user_procTaskQueueLen];
-static void loop(os_event_t *events);
 
 #define MAC_SIZE 6
 uint8 original_mac_addr [MAC_SIZE] = {0, 0, 0, 0, 0, 0};
@@ -20,6 +18,8 @@ const uint16 DST_PORT = 3333;
 
 struct espconn conn;
 esp_udp udp;
+
+os_timer_t my_timer;
 
 void ICACHE_FLASH_ATTR
 send_datagram() {
@@ -60,6 +60,21 @@ send_datagram() {
             }
     }
     espconn_delete(&conn);
+}
+
+
+void timer_callback(void *arg) {
+    os_printf("Invoking callback\n");
+    send_datagram();
+}
+
+//Loop
+static void ICACHE_FLASH_ATTR
+loop(os_event_t *events)
+{
+    send_datagram();
+    os_delay_us(2*1000*1000);
+    system_os_post(user_procTaskPrio, 0, 0 );
 }
 
 // wifi: ESP has two "interfaces": one when acting as a station and another when it's acting as an AP
@@ -134,4 +149,9 @@ user_init()
     wifi_station_set_config(&stationConf);
 
     wifi_set_event_handler_cb(wifi_callback);
+
+    os_timer_setfn(&my_timer, timer_callback, NULL);
+    // last flag re-arms the timer
+    os_timer_arm(&my_timer, 1000, true);
+
 }
