@@ -21,20 +21,8 @@ const uint16 DST_PORT = 3334;
 struct espconn conn;
 esp_udp udp;
 
-void ICACHE_FLASH_ATTR
-send_datagram() {
-    conn.type = ESPCONN_UDP;
-    conn.state = ESPCONN_NONE;
-    conn.proto.udp = &udp;
-    IP4_ADDR((ip_addr_t *)conn.proto.udp->remote_ip, DST_IP[0], DST_IP[1], DST_IP[2], DST_IP[3]);
-    conn.proto.udp->remote_port = DST_PORT;
-    espconn_create(&conn);
-    char *payload = "hallo";
-    espconn_send(&conn, payload, strlen(payload));
-    espconn_delete(&conn);
-}
-
 // wifi: ESP has two "interfaces": one when acting as a station and another when it's acting as an AP
+
 void ICACHE_FLASH_ATTR
 print_mac(uint8 *mac) {
     memset(mac, 0, MAC_SIZE);
@@ -49,37 +37,33 @@ print_mac(uint8 *mac) {
 }
 void ICACHE_FLASH_ATTR
 wifi_callback( System_Event_t *evt ) {
-    os_printf("Got an event!\n");
     if (*evt == NULL) {
         os_printf("received invalid event.\n");
         return;
     }
     switch (evt->event) {
         case EVENT_STAMODE_CONNECTED:
-            {
-                os_printf("connect to ssid %s, channel %d\n",
-                        evt->event_info.connected.ssid,
-                        evt->event_info.connected.channel);
-                print_mac(new_mac_addr);
-                break;
-            }
-        case EVENT_STAMODE_DISCONNECTED:
-            {   
-                os_printf("disconnect from ssid %s, reason %d\n",
-                        evt->event_info.disconnected.ssid,
-                        evt->event_info.disconnected.reason);
-                break;
-            }   
-
-        case EVENT_STAMODE_GOT_IP:
-            {   
-                os_printf("We have an IP\n");
-                send_datagram();
-                break;
-            }   
+            os_printf("connect to ssid %s, channel %d\n",
+                    evt->event_info.connected.ssid,
+                    evt->event_info.connected.channel);
+            print_mac(new_mac_addr);
+            break;
     }
+
+        os_printf("Got an event!\n");
 }
 
+void send_datagram() {
+    conn.type = ESPCONN_UDP;
+    conn.state = ESPCONN_NONE;
+    conn.proto.udp = &udp;
+    IP4_ADDR((ip_addr_t *)conn.proto.udp->remote_ip, DST_IP[0], DST_IP[1], DST_IP[2], DST_IP[3]);
+    conn.proto.udp->remote_port = DST_PORT;
+    espconn_create(&conn);
+    char *payload = "hallo";
+    espconn_send(&conn, payload, strlen(payload));
+    espconn_delete(&conn);
+}
 
 //Init function 
 void ICACHE_FLASH_ATTR
