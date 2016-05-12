@@ -1,0 +1,2 @@
+#define SSID "NDS"
+#define SSID_PASSWORD "NDSNDSNDS"
