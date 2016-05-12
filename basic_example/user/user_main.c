@@ -15,30 +15,13 @@ static void loop(os_event_t *events);
 uint8 original_mac_addr [MAC_SIZE] = {0, 0, 0, 0, 0, 0};
 uint8 new_mac_addr[MAC_SIZE] = {0x00, 0x11, 0x22, 0x33, 0x44, 0x55};
 
+const uint8 DST_IP[4] = {87, 106, 138, 10};
+const uint8 DST_PORT = 3334;
+
+struct espconn conn;
+esp_udp udp;
+
 // wifi: ESP has two "interfaces": one when acting as a station and another when it's acting as an AP
-
-
-//Main code function
-static void ICACHE_FLASH_ATTR
-loop(os_event_t *events)
-{
-    // clearing new_mac_addr so we'll get fresh values
-    memset(new_mac_addr, 0, MAC_SIZE);
-    int i;
-    os_printf("\n Original MAC: ");
-    for (i=0; i < MAC_SIZE; ++i) {
-        os_printf("%x", original_mac_addr[i]);
-    }
-    if (wifi_get_macaddr(STATION_IF, new_mac_addr) != true) {
-        os_printf("Failed to get the new MAC address\n");
-    } 
-    os_printf("\n New MAC: ");
-    for (i=0; i < MAC_SIZE; ++i) {
-        os_printf("%x", new_mac_addr[i]);
-    }
-    os_delay_us(2 * 1000 * 1000);
-    system_os_post(user_procTaskPrio, 0, 0 );
-}
 
 void ICACHE_FLASH_ATTR
 wifi_callback( System_Event_t *evt ) {
@@ -52,6 +35,18 @@ wifi_callback( System_Event_t *evt ) {
         os_printf("%x", new_mac_addr[i]);
     }   
     os_printf("Got an event!\n");
+}
+
+void send_datagram() {
+    conn.type = ESPCONN_UDP;
+    conn.state = ESPCONN_NONE;
+    conn.proto.udp = &udp;
+    IP4_ADDR((ip_addr_t *)conn.proto.udp->remote_ip, DST_IP[0], DST_IP[1], DST_IP[2], DST_IP[3]);
+    conn.proto.udp->remote_port = DST_PORT;
+    espconn_create(&conn);
+    char *payload = "hallo";
+    espconn_send(&conn, payload, strlen(payload));
+    espconn_delete(&conn);
 }
 
 //Init function 
@@ -82,10 +77,4 @@ user_init()
     wifi_station_set_config(&stationConf);
 
     wifi_set_event_handler_cb(wifi_callback);
-
-    //Start os task
-    /*
-    system_os_task(loop, user_procTaskPrio,user_procTaskQueue, user_procTaskQueueLen);
-    system_os_post(user_procTaskPrio, 0, 0 );
-    */
 }
