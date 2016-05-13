@@ -1,3 +1,3 @@
-#define SSID "NDS"
-#define SSID_PASSWORD "NDSNDSNDS"
+#define SSID "VPN/WEB"
+#define SSID_PASSWORD ""
 
