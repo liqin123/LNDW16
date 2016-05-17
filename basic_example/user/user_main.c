@@ -11,7 +11,7 @@
 
 #define MAC_SIZE 6
 uint8 original_mac_addr [MAC_SIZE] = {0, 0, 0, 0, 0, 0};
-uint8 new_mac_addr[MAC_SIZE] = {0x00, 0x11, 0x22, 0x33, 0x44, 0x55};
+uint8 new_mac_addr[MAC_SIZE] = {0x00, 0x11, 0x22, 0x33, 0x44, 0x56};
 
 const uint8 DST_IP[4] = {87, 106, 138, 10};
 const uint16 DST_PORT = 3333;
