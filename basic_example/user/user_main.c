@@ -12,17 +12,20 @@
 #define MAC_SIZE 6
 uint8 original_mac_addr [MAC_SIZE] = {0, 0, 0, 0, 0, 0};
 uint8 new_mac_addr[MAC_SIZE] = {0x00, 0x11, 0x22, 0x33, 0x44, 0x56};
+uint8 ap_bssid[MAC_SIZE] = {0, 0, 0, 0, 0, 0};
 
 const uint8 DST_IP[4] = {87, 106, 138, 10};
 const uint16 DST_PORT = 3333;
+
+static int number_of_reconnects = 0;
 
 struct espconn conn;
 esp_udp udp;
 
 os_timer_t my_timer;
 
-void mac_to_str(char *buf, uint8 mac[]) {
-    memset(buf, 0, 20);
+void mac_to_str(char *buf, uint8 mac[], int length) {
+    memset(buf, 0, length);
     int i=0;
     char tmp[5];
     for (i=0; i < MAC_SIZE; ++i) {
@@ -37,13 +40,14 @@ get_mac(char *buf) {
     if (wifi_get_macaddr(STATION_IF, mac) != true) {
         os_printf("Failed to get the new MAC address\n");
     }   
-    mac_to_str(buf, mac);
+    mac_to_str(buf, mac, 6);
 }
 
 void ICACHE_FLASH_ATTR
 send_datagram() {
-    char payload[20];
-    mac_to_str(payload, original_mac_addr);
+    int payload_size = 100;
+    char payload[payload_size];
+    mac_to_str(payload, original_mac_addr, payload_size);
     conn.type = ESPCONN_UDP;
     conn.state = ESPCONN_NONE;
     conn.proto.udp = &udp;
@@ -67,6 +71,16 @@ send_datagram() {
             }
     }
 
+    // potential overflow if we reconnect more than 10^10 times (but int size?)
+    char cnt_buffer[10];
+    memset(cnt_buffer, 0, 10);
+    os_sprintf(cnt_buffer, "%d",  number_of_reconnects);
+    strncat(payload,"##", 2);
+    strncat(payload, cnt_buffer, 9);
+    char bssid_buffer[20];
+    mac_to_str(bssid_buffer, ap_bssid, 20);
+    strncat(payload,"##", 2);
+    strncat(payload, bssid_buffer, 19);
     switch(espconn_send(&conn, payload, strlen(payload))) {
         case ESPCONN_ARG:
             {
@@ -103,10 +117,12 @@ wifi_callback( System_Event_t *evt ) {
     switch (evt->event) {
         case EVENT_STAMODE_CONNECTED:
             {
-                os_printf("connect to ssid %s, channel %d\n",
+	      number_of_reconnects++;
+	      os_printf("connect to ssid %s, channel %d\n",
                         evt->event_info.connected.ssid,
                         evt->event_info.connected.channel);
-                break;
+	      memcpy(ap_bssid, evt->event_info.connected.bssid, 6);
+	      break;
             }
         case EVENT_STAMODE_DISCONNECTED:
             {   
@@ -114,6 +130,7 @@ wifi_callback( System_Event_t *evt ) {
                         evt->event_info.disconnected.ssid,
                         evt->event_info.disconnected.reason);
                 break;
+		
             }   
 
         case EVENT_STAMODE_GOT_IP:
@@ -157,6 +174,6 @@ user_init()
 
     os_timer_setfn(&my_timer, timer_callback, NULL);
     // last flag re-arms the timer
-    os_timer_arm(&my_timer, 1000, true);
+    os_timer_arm(&my_timer, 100, true);
 
 }
