@@ -11,12 +11,20 @@
 os_event_t    user_procTaskQueue[user_procTaskQueueLen];
 #define printmac(buf, i) os_printf("\t%02X:%02X:%02X:%02X:%02X:%02X", buf[i+0], buf[i+1], buf[i+2], \
 				    buf[i+3], buf[i+4], buf[i+5])
+
 static volatile os_timer_t channelHop_timer;
+
 
 static void loop(os_event_t *events);
 static void promisc_cb(uint8 *buf, uint16 len);
                                           
 
+void hop_channel(void *arg) {
+    os_printf("old channel: %d\n", wifi_get_channel())
+    int channel = wifi_get_channel() % 13 + 1;
+    os_printf("new channel: %d\n", channel);
+    wifi_set_channel(channel);
+}
 
 static void ICACHE_FLASH_ATTR
 promisc_cb(uint8 *buf, uint16 len)
@@ -37,26 +45,28 @@ loop(os_event_t *events)
 
 void ICACHE_FLASH_ATTR
 sniffer_init_done() {
+    os_printf("Enter: sniffer_init_done");
     wifi_station_set_auto_connect(false); // do not connect automatically
     wifi_station_disconnect(); // no idea if this is permanent
     wifi_promiscuous_enable(false);
     wifi_set_promiscuous_rx_cb(promisc_cb);
     wifi_promiscuous_enable(true);
     os_printf("done.\n");
-
     wifi_set_channel(1);
+
+    
 }
+
 //Init function 
 void ICACHE_FLASH_ATTR
 user_init()
 {
-  uart_div_modify( 0, UART_CLK_FREQ / ( 115200 ) );
-    os_delay_us(100);
-
-    os_printf(" -> Promisc mode setup ... ");
-    
+    uart_div_modify( 0, UART_CLK_FREQ / ( 115200 ) );
     wifi_set_opmode(0x1); // 0x1: station mode
-    os_printf(" -> Init finished!\n\n");
     system_init_done_cb(sniffer_init_done);
+    
+    os_timer_disarm(&channelHop_timer);
+    os_timer_setfn(&channelHop_timer, (os_timer_func_t *) hop_channel, NULL);
+    os_timer_arm(&channelHop_timer, CHANNEL_HOP_INTERVAL, 1);
 }
 
