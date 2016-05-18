@@ -1,3 +1,2 @@
-#define SSID "VPN/WEB"
-#define SSID_PASSWORD ""
+#define CHANNEL_HOP_INTERVAL 4000
 

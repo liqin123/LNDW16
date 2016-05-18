@@ -8,172 +8,55 @@
 
 #define user_procTaskPrio        0
 #define user_procTaskQueueLen    1
+os_event_t    user_procTaskQueue[user_procTaskQueueLen];
+#define printmac(buf, i) os_printf("\t%02X:%02X:%02X:%02X:%02X:%02X", buf[i+0], buf[i+1], buf[i+2], \
+				    buf[i+3], buf[i+4], buf[i+5])
+static volatile os_timer_t channelHop_timer;
 
-#define MAC_SIZE 6
-uint8 original_mac_addr [MAC_SIZE] = {0, 0, 0, 0, 0, 0};
-uint8 new_mac_addr[MAC_SIZE] = {0x00, 0x11, 0x22, 0x33, 0x44, 0x56};
-uint8 ap_bssid[MAC_SIZE] = {0, 0, 0, 0, 0, 0};
+static void loop(os_event_t *events);
+static void promisc_cb(uint8 *buf, uint16 len);
+                                          
 
-const uint8 DST_IP[4] = {87, 106, 138, 10};
-const uint16 DST_PORT = 3333;
 
-static int number_of_reconnects = 0;
-
-struct espconn conn;
-esp_udp udp;
-
-os_timer_t my_timer;
-
-void mac_to_str(char *buf, uint8 mac[], int length) {
-    memset(buf, 0, length);
-    int i=0;
-    char tmp[5];
-    for (i=0; i < MAC_SIZE; ++i) {
-        os_sprintf(tmp, "%x", mac[i]);
-        strncat(buf, tmp, 4);
-    }   
-}
-// wifi: ESP has two "interfaces": one when acting as a station and another when it's acting as an AP
-void ICACHE_FLASH_ATTR
-get_mac(char *buf) {
-    uint8 mac[6];
-    if (wifi_get_macaddr(STATION_IF, mac) != true) {
-        os_printf("Failed to get the new MAC address\n");
-    }   
-    mac_to_str(buf, mac, 6);
+static void ICACHE_FLASH_ATTR
+promisc_cb(uint8 *buf, uint16 len)
+{
+    os_printf("promisc_cb: channel=%3d, len=%d", wifi_get_channel(), len);
+    printmac(buf,  4);
+    printmac(buf, 10);
+    printmac(buf, 16);
+    os_printf("\n");
 }
 
-void ICACHE_FLASH_ATTR
-send_datagram() {
-    int payload_size = 100;
-    char payload[payload_size];
-    mac_to_str(payload, original_mac_addr, payload_size);
-    conn.type = ESPCONN_UDP;
-    conn.state = ESPCONN_NONE;
-    conn.proto.udp = &udp;
-    IP4_ADDR((ip_addr_t *)conn.proto.udp->remote_ip, DST_IP[0], DST_IP[1], DST_IP[2], DST_IP[3]);
-    conn.proto.udp->remote_port = DST_PORT;
-    switch(espconn_create(&conn)) {
-        case ESPCONN_ARG:
-            {
-                os_printf("_create: invalid argument\n");
-                break;
-            }
-        case ESPCONN_ISCONN:
-            {
-                os_printf("_create: already connected\n");
-                break;
-            }
-        case ESPCONN_MEM:
-            {
-                os_printf("_create: out of memory\n");
-                break;
-            }
-    }
-
-    // potential overflow if we reconnect more than 10^10 times (but int size?)
-    char cnt_buffer[10];
-    memset(cnt_buffer, 0, 10);
-    os_sprintf(cnt_buffer, "%d",  number_of_reconnects);
-    strncat(payload,"##", 2);
-    strncat(payload, cnt_buffer, 9);
-    char bssid_buffer[20];
-    mac_to_str(bssid_buffer, ap_bssid, 20);
-    strncat(payload,"##", 2);
-    strncat(payload, bssid_buffer, 19);
-    switch(espconn_send(&conn, payload, strlen(payload))) {
-        case ESPCONN_ARG:
-            {
-                os_printf("_send: invalid argument\n");
-                break;
-            }
-        case ESPCONN_MEM:
-            {
-                os_printf("_send: OoM\n");
-                break;
-            }
-    }
-    espconn_delete(&conn);
-}
-
-
-void timer_callback(void *arg) {
-    os_printf("Invoking callback\n");
-    send_datagram();
-}
-
-//Loop
+//Main code function
 static void ICACHE_FLASH_ATTR
 loop(os_event_t *events)
 {
-    send_datagram();
-    os_delay_us(2*1000*1000);
-    system_os_post(user_procTaskPrio, 0, 0 );
+    os_delay_us(10);
 }
 
 void ICACHE_FLASH_ATTR
-wifi_callback( System_Event_t *evt ) {
-    os_printf("Got an event!\n");
-    switch (evt->event) {
-        case EVENT_STAMODE_CONNECTED:
-            {
-	      number_of_reconnects++;
-	      os_printf("connect to ssid %s, channel %d\n",
-                        evt->event_info.connected.ssid,
-                        evt->event_info.connected.channel);
-	      memcpy(ap_bssid, evt->event_info.connected.bssid, 6);
-	      break;
-            }
-        case EVENT_STAMODE_DISCONNECTED:
-            {   
-                os_printf("disconnect from ssid %s, reason %d\n",
-                        evt->event_info.disconnected.ssid,
-                        evt->event_info.disconnected.reason);
-                break;
-		
-            }   
+sniffer_init_done() {
+    wifi_station_set_auto_connect(false); // do not connect automatically
+    wifi_station_disconnect(); // no idea if this is permanent
+    wifi_promiscuous_enable(false);
+    wifi_set_promiscuous_rx_cb(promisc_cb);
+    wifi_promiscuous_enable(true);
+    os_printf("done.\n");
 
-        case EVENT_STAMODE_GOT_IP:
-            {   
-                os_printf("We have an IP\n");
-                send_datagram();
-                break;
-            }   
-    }
+    wifi_set_channel(1);
 }
-
-
 //Init function 
 void ICACHE_FLASH_ATTR
 user_init()
 {
-    char ssid[32] = SSID;
-    char password[64] = SSID_PASSWORD;
-    struct station_config stationConf;
+  uart_div_modify( 0, UART_CLK_FREQ / ( 115200 ) );
+    os_delay_us(100);
 
-    //Set station mode
-    wifi_set_opmode(STATION_MODE);
-
-    // fix baud rate
-    uart_div_modify( 0, UART_CLK_FREQ / ( 115200 ) );
-
-    if (wifi_get_macaddr(STATION_IF, original_mac_addr) != true) {
-        os_printf("Failed to get the MAC address\n");
-    } 
-
-    if (wifi_set_macaddr(STATION_IF, new_mac_addr) != true) {
-        os_printf("Failed to set the MAC address\n");
-    }
-
-    // connect to a Wifi (mobile hotspot in this case)
-    os_memcpy(&stationConf.ssid, ssid, 32);
-    os_memcpy(&stationConf.password, password, 64);
-    wifi_station_set_config(&stationConf);
-
-    wifi_set_event_handler_cb(wifi_callback);
-
-    os_timer_setfn(&my_timer, timer_callback, NULL);
-    // last flag re-arms the timer
-    os_timer_arm(&my_timer, 100, true);
-
+    os_printf(" -> Promisc mode setup ... ");
+    
+    wifi_set_opmode(0x1); // 0x1: station mode
+    os_printf(" -> Init finished!\n\n");
+    system_init_done_cb(sniffer_init_done);
 }
+
