@@ -20,7 +20,7 @@ static void promisc_cb(uint8 *buf, uint16 len);
                                           
 
 void hop_channel(void *arg) {
-    os_printf("old channel: %d\n", wifi_get_channel())
+    os_printf("old channel: %d\n", wifi_get_channel());
     int channel = wifi_get_channel() % 13 + 1;
     os_printf("new channel: %d\n", channel);
     wifi_set_channel(channel);
