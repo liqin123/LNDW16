@@ -191,6 +191,16 @@ uart0_tx_buffer(uint8 *buf, uint16 len)
     }
 }
 
+void ICACHE_FLASH_ATTR
+uart1_tx_buffer(uint8 *buf, uint16 len)
+{
+    uint16 i;
+    for (i = 0; i < len; i++)
+    {
+	    uart_tx_one_char(UART1, buf[i]);
+    }
+}
+
 /******************************************************************************
  * FunctionName : uart0_sendStr
  * Description  : use uart0 to transfer buffer
