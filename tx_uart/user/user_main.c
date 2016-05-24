@@ -9,6 +9,7 @@
 
 
 static volatile os_timer_t transmit_timer;
+uint8 test_data[] = {1, 2, 3, 4, 5, 6};
 
 /*
  * Receives the characters from the serial port.
@@ -38,7 +39,9 @@ LOCAL void ICACHE_FLASH_ATTR uart1_sendStr(const char *str)
 }
 
 LOCAL void ICACHE_FLASH_ATTR transmit_cb(void *arg) {
-    uart1_sendStr("Important Data");
+    uint8 preamble[] = {6};
+    uart1_tx_buffer(preamble, 1);
+    uart1_tx_buffer(test_data, sizeof(test_data));
 }
 
 LOCAL void ICACHE_FLASH_ATTR set_transmit_timer(uint16_t interval) {
@@ -56,5 +59,6 @@ user_init()
     // lässt sämtliche os_printf calls ins leere laufen
     system_set_os_print(0);
     set_transmit_timer(1000);
+    os_memset(test_data, 1, sizeof(test_data));
 }
 
