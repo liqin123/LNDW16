@@ -1,0 +1,2 @@
+#define CHANNEL_HOP_INTERVAL 4000
+

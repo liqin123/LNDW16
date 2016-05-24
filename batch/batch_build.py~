@@ -1,0 +1,8 @@
+#!/usr/bin/env python
+
+"""
+Pass a value to the makefile
+create a new directory for each firmware (0x0000, 0x4000)
+copy the firmware
+"""
+
