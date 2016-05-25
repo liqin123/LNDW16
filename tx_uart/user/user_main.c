@@ -19,9 +19,9 @@ uint8 switch_flag=0;
 #define STOP_BYTE_CASE 0xa0
 #define ESCAPE_BYTE_CASE 0x55
 
-uint8 start_byte[] = {START_BYTE_CASE};
-uint8  stop_byte[] = {STOP_BYTE_CASE};
-uint8  escape_byte[] = {ESCAPE_BYTE_CASE};
+uint8 start_byte = START_BYTE_CASE;
+uint8 stop_byte = STOP_BYTE_CASE;
+uint8 escape_byte = ESCAPE_BYTE_CASE;
 
 
 
@@ -49,36 +49,47 @@ void ICACHE_FLASH_ATTR uart_rx_task(os_event_t *events) {
     }
 }
 
-
-void send_data(uint8 buffer[], uint8 len) {
-
-    uint8 *tmp_buf = (uint8 *)os_malloc(len*2);
-    uint16 new_len = 0;
+/* Every occurrence of either the start, escape or stop sequence needs to be escaped by prepending an escape byte
+   src: the data that needs to be escaped
+   dst: the escaped data (2 * len)
+   len: length of src
+*/
+uint8 encode_buffer(uint8 src[], uint8 dst[], uint8 len) {
+    uint8 new_len = 0;
     int i=0;
     for (i; i < len; i++, new_len++) {
-	switch (buffer[i]) {
+	switch (src[i]) {
 	case START_BYTE_CASE:
-	        tmp_buf[new_len] = escape_byte[0];
-		++new_len;
-		break;
+	    dst[new_len] = escape_byte;
+	    ++new_len;
+	    break;
 	case STOP_BYTE_CASE:
-	    tmp_buf[new_len] = escape_byte[0];
-		++new_len;
-		break;
+	    dst[new_len] = escape_byte;
+	    ++new_len;
+	    break;
 	case ESCAPE_BYTE_CASE:
-	    	tmp_buf[new_len] = escape_byte[0];
-		++new_len;
-		break;
+	    dst[new_len] = escape_byte;
+	    ++new_len;
+	    break;
 	default: break;
 	}
-	tmp_buf[new_len] =  buffer[i];
+	dst[new_len] = src[i];
     }
-    uart1_tx_buffer(start_byte, 1);
-    uint8 length_byte[] = {new_len};
-    uart1_tx_buffer(length_byte, 1);
-    uart1_tx_buffer(tmp_buf, new_len);
-    uart1_tx_buffer(stop_byte, 1);
-    os_free(tmp_buf);
+    return new_len;
+
+}
+// Sending a sequence of: start byte - (escaped) length byte - (escaped) payload - stop byte
+void send_data(uint8 buffer[], uint8 len) {
+    uint8 *payload_buf = (uint8 *)os_malloc(len*2);
+    uint8 actual_length_payload = encode_buffer(buffer, payload_buf, len);
+    uint8 actual_length_buf[2];
+    // we also need to escape the length byte
+    uint8 actual_length_length = encode_buffer(&actual_length_payload, actual_length_buf, 1);
+    uart1_tx_buffer(&start_byte, 1);
+    uart1_tx_buffer(actual_length_buf, actual_length_length);
+    uart1_tx_buffer(payload_buf, actual_length_payload);
+    uart1_tx_buffer(&stop_byte, 1);
+    os_free(payload_buf);
 }
 
 LOCAL void ICACHE_FLASH_ATTR transmit_cb(void *arg) {
