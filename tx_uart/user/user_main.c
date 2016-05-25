@@ -7,12 +7,10 @@
 #include "espconn.h"
 #include "driver/uart.h"
 
-
-static volatile os_timer_t transmit_timer;
-uint8 test_data[] = {1, 2, 3, 4, 5, 6};
+static volatile os_timer_t channelHop_timer;
 
 /*
- * Receives the characters from the serial port.
+ * Receives the characters from the serial port. Dummy to make the compiler happy.
  */
 
 void ICACHE_FLASH_ATTR uart_rx_task(os_event_t *events) {
@@ -27,38 +25,46 @@ void ICACHE_FLASH_ATTR uart_rx_task(os_event_t *events) {
         WRITE_PERI_REG(UART_INT_CLR(UART0), UART_RXFIFO_FULL_INT_CLR|UART_RXFIFO_TOUT_INT_CLR);
         uart_rx_intr_enable(UART0);
     }
-   
-
 }
 
-LOCAL void ICACHE_FLASH_ATTR uart1_sendStr(const char *str)
+void hop_channel(void *arg) {
+    os_printf("old channel: %d\n", wifi_get_channel());
+    int channel = wifi_get_channel() % 13 + 1;
+    os_printf("new channel: %d\n", channel);
+    wifi_set_channel(channel);
+}
+
+void 
+promisc_cb(uint8 *buf, uint16 len)
 {
-    while(*str){
-        uart_tx_one_char(UART1, *str++);
-    }
-}
-
-LOCAL void ICACHE_FLASH_ATTR transmit_cb(void *arg) {
-    uint8 preamble[] = {6};
+    uint8 preamble[] = {len};
     uart1_tx_buffer(preamble, 1);
-    uart1_tx_buffer(test_data, sizeof(test_data));
+    uart1_tx_buffer(buf, len);
 }
 
-LOCAL void ICACHE_FLASH_ATTR set_transmit_timer(uint16_t interval) {
-    // Start a timer for the flashing of the LED on GPIO 4, running continuously.
-    os_timer_disarm(&transmit_timer);
-    os_timer_setfn(&transmit_timer, (os_timer_func_t *)transmit_cb, (void *)0);
-    os_timer_arm(&transmit_timer, interval, 1);
+void ICACHE_FLASH_ATTR
+sniffer_init_done() {
+    os_printf("Enter: sniffer_init_done");
+    wifi_station_set_auto_connect(false); // do not connect automatically
+    wifi_station_disconnect(); // no idea if this is permanent
+    wifi_promiscuous_enable(false);
+    wifi_set_promiscuous_rx_cb(promisc_cb);
+    wifi_promiscuous_enable(true);
+    os_printf("done.\n");
+    wifi_set_channel(1);
 }
-
 
 void ICACHE_FLASH_ATTR
 user_init()
 {
     uart_init(BIT_RATE_115200, BIT_RATE_115200);
     // lässt sämtliche os_printf calls ins leere laufen
-    system_set_os_print(0);
-    set_transmit_timer(1000);
-    os_memset(test_data, 1, sizeof(test_data));
+    //system_set_os_print(0);
+    wifi_set_opmode(0x1); // 0x1: station mode
+    system_init_done_cb(sniffer_init_done);
+    
+    os_timer_disarm(&channelHop_timer);
+    os_timer_setfn(&channelHop_timer, (os_timer_func_t *) hop_channel, NULL);
+    os_timer_arm(&channelHop_timer, CHANNEL_HOP_INTERVAL, 1);
 }
 

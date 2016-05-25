@@ -7,10 +7,10 @@
 #include "espconn.h"
 #include "driver/uart.h"
 
-#define MAX_BUF_SIZE 200
+#define MAX_BUF_SIZE 500
 
-uint8 next_packet_size = 0;
-uint8 bytes_read = 0;
+uint16 next_packet_size = 0;
+uint16 bytes_read = 0;
 uint8 uart_buffer[MAX_BUF_SIZE];
 
 /*
