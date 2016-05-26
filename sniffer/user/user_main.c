@@ -53,6 +53,14 @@ int cache_new (uint8 *addr)
     int oldest = 0;
     int oldest_age = 2^32-1;
 
+#ifdef XM_PREFIX
+    if (memcmp (addr, XM_PREFIX, XM_PREFIX_LEN) == 0)
+    {
+        // A packet from our sending device, ignore.
+        return 0;
+    }
+#endif // XM_PREFIX
+
     for (i = 0; i < MAX_CACHE_ENTRIES; i++)
     {
         // Compare cache entry
