@@ -8,15 +8,16 @@ byte start_byte = START_BYTE_CASE;
 byte stop_byte = STOP_BYTE_CASE;
 byte escape_byte = ESCAPE_BYTE_CASE;
 
+void debug(const char *function_name, struct state *s) {
+    printf("%s\n", function_name);
+}
 
 byte read_next_byte(struct state *s) {
+    debug(__func__, s);
     s->fifo_len--;
     return s->read_cb();
 }
 
-void debug(const char *function_name, struct state *s) {
-    printf("%s\n", function_name);
-}
 
 
 void reset_state(struct state *s) {
@@ -75,6 +76,7 @@ void read_data_fn(struct state *s) {
     case STOP_BYTE_CASE:
 	s->flush_cb(s);
 	reset_state(s);
+	printf("Setting s->next to start_fn\n");
 	s->next = start_fn;
 	break;
     case ESCAPE_BYTE_CASE:
@@ -108,7 +110,7 @@ void init_state_machine(struct state *s) {
    dst: the escaped data (2 * len)
    len: length of src
 */
-byte escape_buffer(byte src[], byte dst[], byte len) {
+byte escape_buffer(const byte src[], byte dst[], byte len) {
     byte new_len = 0;
     int i;
     for (i=0;i < len; i++, new_len++) {
@@ -132,7 +134,7 @@ byte escape_buffer(byte src[], byte dst[], byte len) {
     return new_len;
 }
 
-int send_packet(byte buffer[], byte len, void (*send_cb)(byte[], byte len)) {
+int send_packet(const byte buffer[], byte len, void (*send_cb)(byte[], byte len)) {
     int byte_counter=0;
     byte *payload_buf = (byte *)malloc(len*2);
     byte actual_length_payload = escape_buffer(buffer, payload_buf, len);
