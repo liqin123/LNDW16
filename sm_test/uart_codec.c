@@ -76,7 +76,6 @@ void read_data_fn(struct state *s) {
     case STOP_BYTE_CASE:
 	s->flush_cb(s);
 	reset_state(s);
-	printf("Setting s->next to start_fn\n");
 	s->next = start_fn;
 	break;
     case ESCAPE_BYTE_CASE:
