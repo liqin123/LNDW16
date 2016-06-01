@@ -90,9 +90,13 @@ void read_data_fn(struct state *s) {
     }
 }
 
+// writes the byte after an escape without interpretation
 void read_data_esc_fn(struct state *s) {
     debug(__func__, s);
     s->next = read_data_fn;
+    byte current_byte = read_next_byte(s);
+    s->buffer[s->already_read] = current_byte;
+    s->already_read++;
 }
 
 void init_state_machine(struct state *s) {
@@ -134,7 +138,7 @@ int send_packet(byte buffer[], byte len, void (*send_cb)(byte[], byte len)) {
     byte actual_length_payload = escape_buffer(buffer, payload_buf, len);
     byte actual_length_buf[2];
     // we also need to escape the length byte
-    byte actual_length_length = escape_buffer(&actual_length_payload, actual_length_buf, 1);
+    byte actual_length_length = escape_buffer(&len, actual_length_buf, 1);
     send_cb(&start_byte, 1);
     send_cb(actual_length_buf, actual_length_length);
     send_cb(payload_buf, actual_length_payload);
