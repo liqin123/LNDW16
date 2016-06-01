@@ -6,12 +6,34 @@
 #include "user_interface.h"
 #include "espconn.h"
 #include "driver/uart.h"
+#include "mem.h"
 
-static volatile os_timer_t channelHop_timer;
+
+static volatile os_timer_t transmit_timer;
+uint8 test_data[] = {1, 2, 3, 4, 5, 6};
+uint8 test_data2[] = {9, 8, 7, 6, 5, 4, 3, 2, 1};
+uint8 test_data3[120];
+uint8 switch_flag=0;
+
+#define START_BYTE_CASE 0x5f
+#define STOP_BYTE_CASE 0xa0
+#define ESCAPE_BYTE_CASE 0x55
+
+uint8 start_byte = START_BYTE_CASE;
+uint8 stop_byte = STOP_BYTE_CASE;
+uint8 escape_byte = ESCAPE_BYTE_CASE;
+
+
 
 /*
  * Receives the characters from the serial port. Dummy to make the compiler happy.
  */
+LOCAL void ICACHE_FLASH_ATTR uart1_sendStr(const char *str)
+{
+    while(*str){
+        uart_tx_one_char(UART1, *str++);
+    }
+}
 
 void ICACHE_FLASH_ATTR uart_rx_task(os_event_t *events) {
     if(events->sig == 0){ 
@@ -27,44 +49,88 @@ void ICACHE_FLASH_ATTR uart_rx_task(os_event_t *events) {
     }
 }
 
-void hop_channel(void *arg) {
-    os_printf("old channel: %d\n", wifi_get_channel());
-    int channel = wifi_get_channel() % 13 + 1;
-    os_printf("new channel: %d\n", channel);
-    wifi_set_channel(channel);
+/* Every occurrence of either the start, escape or stop sequence needs to be escaped by prepending an escape byte
+   src: the data that needs to be escaped
+   dst: the escaped data (2 * len)
+   len: length of src
+*/
+uint8 encode_buffer(uint8 src[], uint8 dst[], uint8 len) {
+    uint8 new_len = 0;
+    int i=0;
+    for (i; i < len; i++, new_len++) {
+	switch (src[i]) {
+	case START_BYTE_CASE:
+	    dst[new_len] = escape_byte;
+	    ++new_len;
+	    break;
+	case STOP_BYTE_CASE:
+	    dst[new_len] = escape_byte;
+	    ++new_len;
+	    break;
+	case ESCAPE_BYTE_CASE:
+	    dst[new_len] = escape_byte;
+	    ++new_len;
+	    break;
+	default: break;
+	}
+	dst[new_len] = src[i];
+    }
+    return new_len;
+
+}
+// Sending a sequence of: start byte - (escaped) length byte - (escaped) payload - stop byte
+void send_data(uint8 buffer[], uint8 len) {
+    uint8 *payload_buf = (uint8 *)os_malloc(len*2);
+    uint8 actual_length_payload = encode_buffer(buffer, payload_buf, len);
+    uint8 actual_length_buf[2];
+    // we also need to escape the length byte
+    uint8 actual_length_length = encode_buffer(&actual_length_payload, actual_length_buf, 1);
+    uart1_tx_buffer(&start_byte, 1);
+    uart1_tx_buffer(actual_length_buf, actual_length_length);
+    uart1_tx_buffer(payload_buf, actual_length_payload);
+    uart1_tx_buffer(&stop_byte, 1);
+    os_free(payload_buf);
 }
 
-void 
-promisc_cb(uint8 *buf, uint16 len)
-{
-    uint8 preamble[] = {len};
-    uart1_tx_buffer(preamble, 1);
-    uart1_tx_buffer(buf, len);
+LOCAL void ICACHE_FLASH_ATTR transmit_cb(void *arg) {
+    switch(switch_flag) {
+    case 0:
+	{
+	    send_data(test_data, sizeof(test_data));
+	    switch_flag = 1;
+	    break;
+	}
+    case 1:
+	{
+	    send_data(test_data2, sizeof(test_data2));
+	    switch_flag = 2;
+	    break;
+	}
+    case 2:
+	{
+	    send_data(test_data3, sizeof(test_data3));
+	    switch_flag = 0;
+	    break;
+	}
+    }
+    
 }
 
-void ICACHE_FLASH_ATTR
-sniffer_init_done() {
-    os_printf("Enter: sniffer_init_done");
-    wifi_station_set_auto_connect(false); // do not connect automatically
-    wifi_station_disconnect(); // no idea if this is permanent
-    wifi_promiscuous_enable(false);
-    wifi_set_promiscuous_rx_cb(promisc_cb);
-    wifi_promiscuous_enable(true);
-    os_printf("done.\n");
-    wifi_set_channel(1);
+LOCAL void ICACHE_FLASH_ATTR set_transmit_timer(uint16_t interval) {
+    // Start a timer for the flashing of the LED on GPIO 4, running continuously.
+    os_timer_disarm(&transmit_timer);
+    os_timer_setfn(&transmit_timer, (os_timer_func_t *)transmit_cb, (void *)0);
+    os_timer_arm(&transmit_timer, interval, 1);
+    os_memset(test_data3, 2, sizeof(test_data3));
 }
 
 void ICACHE_FLASH_ATTR
 user_init()
 {
-    uart_init(BIT_RATE_115200, BIT_RATE_115200);
+    uart_init(BIT_RATE_115200, BIT_RATE_3686400);
     // lässt sämtliche os_printf calls ins leere laufen
-    //system_set_os_print(0);
-    wifi_set_opmode(0x1); // 0x1: station mode
-    system_init_done_cb(sniffer_init_done);
-    
-    os_timer_disarm(&channelHop_timer);
-    os_timer_setfn(&channelHop_timer, (os_timer_func_t *) hop_channel, NULL);
-    os_timer_arm(&channelHop_timer, CHANNEL_HOP_INTERVAL, 1);
+    system_set_os_print(0);
+    set_transmit_timer(5);
+
 }
 
