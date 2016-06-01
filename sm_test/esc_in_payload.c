@@ -3,7 +3,7 @@
 #include <string.h>
 #include "uart_codec.h"
 
-byte test_buffer[] = {1, 2, 3, 1, 2, 3, 4, 5, 6, 7};
+byte test_buffer[] = {1, 2, 3, 1, 2, 3, 4, 5, 6, 7, START_BYTE_CASE, STOP_BYTE_CASE, 2, 3, 4};
 
 byte *test_target_buffer;
 byte test_target_buffer_idx = 0;
@@ -28,12 +28,14 @@ void test_send(byte buffer[], byte len) {
     test_target_buffer_idx += len;
 }
 
-// send: we receive a single struct that we can send as is
-// recv: we receive a byte stream, therefore we need to loop
 int main() {
+    // sending test data
+    printf("Simple test\n");
     test_target_buffer = malloc(2*sizeof(test_buffer));
     int sent = send_packet(test_buffer, sizeof(test_buffer), test_send);
+    // resetting the test buffer
     test_target_buffer_idx = 0;
+    // reconstructing the data
     struct state *s = malloc(sizeof(struct state));
     init_state_machine(s);
     s->fifo_len = sent;

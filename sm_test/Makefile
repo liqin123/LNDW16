@@ -1,8 +1,11 @@
 CC=clang
-all: main
+all: simple esc_in_payload
 
-main: main.o uart_codec.o
-	$(CC)  main.o uart_codec.o -o $@
+simple: simple.o uart_codec.o
+	$(CC)  simple.o uart_codec.o -o $@
+
+esc_in_payload: esc_in_payload.o uart_codec.o
+	$(CC)  esc_in_payload.o uart_codec.o -o $@
 
 clean:
 	rm -f *.o
