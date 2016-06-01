@@ -27,4 +27,7 @@ struct state {
     
 };
 
+int send_packet(byte buffer[], byte len, void (*send_cb)(byte[], byte len));
+
+
 #endif // _UART_CODEC_H

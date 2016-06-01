@@ -99,3 +99,47 @@ void init_state_machine(struct state *s) {
     s->next = start_fn;
 }
 
+/* Every occurrence of either the start, escape or stop sequence needs to be escaped by prepending an escape byte
+   src: the data that needs to be escaped
+   dst: the escaped data (2 * len)
+   len: length of src
+*/
+byte escape_buffer(byte src[], byte dst[], byte len) {
+    byte new_len = 0;
+    int i;
+    for (i=0;i < len; i++, new_len++) {
+	switch (src[i]) {
+	case START_BYTE_CASE:
+	    dst[new_len] = escape_byte;
+	    ++new_len;
+	    break;
+	case STOP_BYTE_CASE:
+	    dst[new_len] = escape_byte;
+	    ++new_len;
+	    break;
+	case ESCAPE_BYTE_CASE:
+	    dst[new_len] = escape_byte;
+	    ++new_len;
+	    break;
+	default: break;
+	}
+	dst[new_len] = src[i];
+    }
+    return new_len;
+}
+
+int send_packet(byte buffer[], byte len, void (*send_cb)(byte[], byte len)) {
+    int byte_counter=0;
+    byte *payload_buf = (byte *)malloc(len*2);
+    byte actual_length_payload = escape_buffer(buffer, payload_buf, len);
+    byte actual_length_buf[2];
+    // we also need to escape the length byte
+    byte actual_length_length = escape_buffer(&actual_length_payload, actual_length_buf, 1);
+    send_cb(&start_byte, 1);
+    send_cb(actual_length_buf, actual_length_length);
+    send_cb(payload_buf, actual_length_payload);
+    send_cb(&stop_byte, 1);
+    free(payload_buf);
+    byte_counter += (1 + 1 + actual_length_length + actual_length_payload);
+    return byte_counter;
+}
