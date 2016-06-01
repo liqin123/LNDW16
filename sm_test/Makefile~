@@ -1,0 +1,5 @@
+CC=clang
+all: main
+
+main: main.o
+	$(CC) $< -o $@

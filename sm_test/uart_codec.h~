@@ -1,0 +1,15 @@
+byte start_byte = START_BYTE_CASE;
+byte stop_byte = STOP_BYTE_CASE;
+byte escape_byte = ESCAPE_BYTE_CASE;
+
+struct state;
+typedef void state_fn(struct state *);
+
+struct state {
+    state_fn *next;
+    byte next_packet_size;
+    byte buffer[BUFFER_SIZE];
+    // muss immer aktuell sein, beim Interrupt entsprechend gesetzt werden
+    byte fifo_len;
+    byte bytes_read;
+};
