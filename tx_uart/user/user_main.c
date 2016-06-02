@@ -6,13 +6,12 @@
 #include "user_interface.h"
 #include "espconn.h"
 #include "driver/uart.h"
+#include "driver/uart_codec.h"
 #include "mem.h"
 
 
 static volatile os_timer_t transmit_timer;
-uint8 test_data[] = {1, 2, 3, 4, 5, 6};
-uint8 test_data2[] = {9, 8, 7, 6, 5, 4, 3, 2, 1};
-uint8 test_data3[120];
+
 
 
 /*
@@ -41,7 +40,7 @@ void ICACHE_FLASH_ATTR uart_rx_task(os_event_t *events) {
 
 
 LOCAL void ICACHE_FLASH_ATTR transmit_cb(void *arg) {
-    send_packet(test_data, sizeof(test_data), uart1_tx_buffer);
+    send_packet(TEST_SEQUENCE, TEST_SEQUENCE_LEN, uart1_tx_buffer);
     
 }
 
@@ -50,16 +49,14 @@ LOCAL void ICACHE_FLASH_ATTR set_transmit_timer(uint16_t interval) {
     os_timer_disarm(&transmit_timer);
     os_timer_setfn(&transmit_timer, (os_timer_func_t *)transmit_cb, (void *)0);
     os_timer_arm(&transmit_timer, interval, 1);
-    os_memset(test_data3, 2, sizeof(test_data3));
 }
 
 void ICACHE_FLASH_ATTR
 user_init()
 {
-    uart_init(BIT_RATE_115200, BIT_RATE_3686400);
+    uart_init(BIT_RATE_115200, BIT_RATE_115200);
     // lässt sämtliche os_printf calls ins leere laufen
     system_set_os_print(0);
     set_transmit_timer(5);
-
 }
 
