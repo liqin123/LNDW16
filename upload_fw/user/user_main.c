@@ -19,7 +19,7 @@ uint8 original_mac_addr [MAC_SIZE] = {0, 0, 0, 0, 0, 0};
 uint8 new_mac_addr[MAC_SIZE] = {0x00, 0x11, 0x22, 0x33, 0x44, 0x56};
 uint8 ap_bssid[MAC_SIZE] = {0, 0, 0, 0, 0, 0};
 
-const uint8 DST_IP[4] = {87, 106, 138, 10};
+const uint8 DST_IP[4] = {141, 76, 46, 34};
 const uint16 DST_PORT = 3333;
 
 struct espconn conn;
