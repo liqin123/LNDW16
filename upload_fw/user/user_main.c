@@ -5,6 +5,11 @@
 #include "user_config.h"
 #include "user_interface.h"
 #include "espconn.h"
+#include "driver/uart.h"
+#include "driver/uart_codec.h"
+#include "mem.h"
+
+struct state *global_uart_state;
 
 #define user_procTaskPrio        0
 #define user_procTaskQueueLen    1
@@ -17,37 +22,33 @@ uint8 ap_bssid[MAC_SIZE] = {0, 0, 0, 0, 0, 0};
 const uint8 DST_IP[4] = {87, 106, 138, 10};
 const uint16 DST_PORT = 3333;
 
-static int number_of_reconnects = 0;
-
 struct espconn conn;
 esp_udp udp;
 
-os_timer_t my_timer;
-
-void mac_to_str(char *buf, uint8 mac[], int length) {
-    memset(buf, 0, length);
-    int i=0;
-    char tmp[5];
-    for (i=0; i < MAC_SIZE; ++i) {
-        os_sprintf(tmp, "%x", mac[i]);
-        strncat(buf, tmp, 4);
-    }   
-}
-// wifi: ESP has two "interfaces": one when acting as a station and another when it's acting as an AP
-void ICACHE_FLASH_ATTR
-get_mac(char *buf) {
-    uint8 mac[6];
-    if (wifi_get_macaddr(STATION_IF, mac) != true) {
-        os_printf("Failed to get the new MAC address\n");
-    }   
-    mac_to_str(buf, mac, 6);
+LOCAL uint8 get_fifo_len() {
+    return (READ_PERI_REG(UART_STATUS(UART0))>>UART_RXFIFO_CNT_S)&UART_RXFIFO_CNT;
 }
 
-void ICACHE_FLASH_ATTR
-send_datagram() {
-    int payload_size = 100;
-    char payload[payload_size];
-    mac_to_str(payload, original_mac_addr, payload_size);
+LOCAL uint8 read_byte_cb() {
+    return READ_PERI_REG(UART_FIFO(UART0)) & 0xFF;
+}
+
+/*
+ * Receives the characters from the serial port.
+ */
+void uart_rx_task(os_event_t *events) {
+    if(events->sig == 0) { 
+	global_uart_state->fifo_len = get_fifo_len();
+	while(global_uart_state->fifo_len > 0) {
+	    global_uart_state->next(global_uart_state);
+	}
+	// reset UART interrupts       
+        WRITE_PERI_REG(UART_INT_CLR(UART0), UART_RXFIFO_FULL_INT_CLR|UART_RXFIFO_TOUT_INT_CLR);
+        uart_rx_intr_enable(UART0);
+    }
+}
+
+byte send_datagram(struct state *s) {
     conn.type = ESPCONN_UDP;
     conn.state = ESPCONN_NONE;
     conn.proto.udp = &udp;
@@ -72,16 +73,7 @@ send_datagram() {
     }
 
     // potential overflow if we reconnect more than 10^10 times (but int size?)
-    char cnt_buffer[10];
-    memset(cnt_buffer, 0, 10);
-    os_sprintf(cnt_buffer, "%d",  number_of_reconnects);
-    strncat(payload,"##", 2);
-    strncat(payload, cnt_buffer, 9);
-    char bssid_buffer[20];
-    mac_to_str(bssid_buffer, ap_bssid, 20);
-    strncat(payload,"##", 2);
-    strncat(payload, bssid_buffer, 19);
-    switch(espconn_send(&conn, payload, strlen(payload))) {
+    switch(espconn_send(&conn, s->buffer, s->already_read)) {
         case ESPCONN_ARG:
             {
                 os_printf("_send: invalid argument\n");
@@ -96,28 +88,12 @@ send_datagram() {
     espconn_delete(&conn);
 }
 
-
-void timer_callback(void *arg) {
-    os_printf("Invoking callback\n");
-    send_datagram();
-}
-
-//Loop
-static void ICACHE_FLASH_ATTR
-loop(os_event_t *events)
-{
-    send_datagram();
-    os_delay_us(2*1000*1000);
-    system_os_post(user_procTaskPrio, 0, 0 );
-}
-
 void ICACHE_FLASH_ATTR
 wifi_callback( System_Event_t *evt ) {
     os_printf("Got an event!\n");
     switch (evt->event) {
         case EVENT_STAMODE_CONNECTED:
             {
-	      number_of_reconnects++;
 	      os_printf("connect to ssid %s, channel %d\n",
                         evt->event_info.connected.ssid,
                         evt->event_info.connected.channel);
@@ -136,7 +112,7 @@ wifi_callback( System_Event_t *evt ) {
         case EVENT_STAMODE_GOT_IP:
             {   
                 os_printf("We have an IP\n");
-                send_datagram();
+                //send_datagram();
                 break;
             }   
     }
@@ -147,6 +123,15 @@ wifi_callback( System_Event_t *evt ) {
 void ICACHE_FLASH_ATTR
 user_init()
 {
+
+    uart_init(BIT_RATE_115200, BIT_RATE_115200);
+    global_uart_state = (struct state*)os_malloc(sizeof(struct state));
+    init_state_machine(global_uart_state);
+    global_uart_state->read_cb = read_byte_cb;
+    global_uart_state->flush_cb = send_datagram;
+
+    system_set_os_print(true);
+    os_printf("ohai there\n");
     char ssid[32] = SSID;
     char password[64] = SSID_PASSWORD;
     struct station_config stationConf;
@@ -154,9 +139,7 @@ user_init()
     //Set station mode
     wifi_set_opmode(STATION_MODE);
 
-    // fix baud rate
-    uart_div_modify( 0, UART_CLK_FREQ / ( 115200 ) );
-
+   
     if (wifi_get_macaddr(STATION_IF, original_mac_addr) != true) {
         os_printf("Failed to get the MAC address\n");
     } 
@@ -169,11 +152,9 @@ user_init()
     os_memcpy(&stationConf.ssid, ssid, 32);
     os_memcpy(&stationConf.password, password, 64);
     wifi_station_set_config(&stationConf);
+    wifi_station_connect();
+    wifi_station_set_auto_connect(true);
 
     wifi_set_event_handler_cb(wifi_callback);
-
-    os_timer_setfn(&my_timer, timer_callback, NULL);
-    // last flag re-arms the timer
-    os_timer_arm(&my_timer, 100, true);
-
+    os_printf("bla blub\n");
 }
