@@ -7,6 +7,9 @@
 #include "espconn.h"
 
 #include "wifi.h"
+#include "mem.h"
+#include "driver/uart.h"
+#include "driver/uart_codec.h"
 
 #define user_procTaskPrio        0
 #define user_procTaskQueueLen    1
@@ -26,7 +29,11 @@ static int watermark;
 static int counter;
 static struct cache_entry cache[MAX_CACHE_ENTRIES];
 
+// dummy
+
+void ICACHE_FLASH_ATTR uart_rx_task(os_event_t *events) {}
 // Initialize channel stats
+
 #ifdef DEBUG
                                           
 void init_stats (void)
@@ -302,6 +309,8 @@ promisc_cb(uint8 *buffer, uint16 length)
     {
         return;
     }
+    // HIER!! HIER!!! VERSENDE MICH!
+    send_packet(buffer, (uint8)length, uart1_tx_buffer);
 
 #ifdef DEBUG
     cs[ChannelIndex]++;
@@ -342,7 +351,7 @@ sniffer_init_done() {
 void ICACHE_FLASH_ATTR
 user_init()
 {
-    uart_div_modify( 0, UART_CLK_FREQ / ( 115200 ) );
+    uart_init(BIT_RATE_115200, BIT_RATE_115200);
     wifi_set_opmode(0x1); // 0x1: station mode
     system_init_done_cb(sniffer_init_done);
     
