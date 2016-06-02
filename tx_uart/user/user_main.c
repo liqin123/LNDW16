@@ -10,6 +10,7 @@
 #include "mem.h"
 
 
+
 static volatile os_timer_t transmit_timer;
 
 
@@ -57,6 +58,6 @@ user_init()
     uart_init(BIT_RATE_115200, BIT_RATE_115200);
     // lässt sämtliche os_printf calls ins leere laufen
     system_set_os_print(0);
-    set_transmit_timer(5);
+    set_transmit_timer(100);
 }
 
