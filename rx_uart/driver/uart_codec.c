@@ -9,6 +9,8 @@ byte start_byte = START_BYTE_CASE;
 byte stop_byte = STOP_BYTE_CASE;
 byte escape_byte = ESCAPE_BYTE_CASE;
 
+byte TEST_SEQUENCE[] = {3, 1, 4, 1, 2, 2, 7, 1, 5, 10, START_BYTE_CASE, 7, STOP_BYTE_CASE, 15, 100}; 
+byte TEST_SEQUENCE_LEN = sizeof(TEST_SEQUENCE);
 void debug(const char *function_name, struct state *s) {
 
     //os_printf("%s\n", function_name);

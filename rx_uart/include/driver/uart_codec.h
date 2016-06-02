@@ -1,7 +1,7 @@
 #ifndef _UART_CODEC_H
 #define _UART_CODEC_H
 
-#define byte unsigned char
+typedef unsigned char byte;
 
 #define START_BYTE_CASE 0x5f
 #define STOP_BYTE_CASE 0xa0
@@ -9,7 +9,8 @@
 
 #define BUFFER_SIZE 250
 
-
+byte TEST_SEQUENCE[15]; // adapt length length (stupid compiler)
+byte TEST_SEQUENCE_LEN;
 struct state;
 typedef void state_fn(struct state *);
 
