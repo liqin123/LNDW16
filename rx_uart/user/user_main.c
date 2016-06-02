@@ -30,6 +30,15 @@ LOCAL void ICACHE_FLASH_ATTR uart1_sendStr(const char *str)
 }
 
 byte my_flush_cb(struct state *s) {
+    char my_buf[200];
+    os_sprintf(my_buf, "received %u bytes\n", s->already_read);
+    uart1_sendStr(my_buf);
+    if (memcmp(s->buffer, TEST_SEQUENCE, TEST_SEQUENCE_LEN) != 0) {
+	os_sprintf(my_buf, "============ERROR============\n");
+    } else {
+	os_sprintf(my_buf, "************SUCCESS**********\n");
+    }
+    uart1_sendStr(my_buf);
     return 1;
 }
 
@@ -52,7 +61,7 @@ void uart_rx_task(os_event_t *events) {
 void ICACHE_FLASH_ATTR
 user_init()
 {
-    uart_init(BIT_RATE_3686400, BIT_RATE_115200);
+    uart_init(BIT_RATE_115200, BIT_RATE_115200);
     global_uart_state = (struct state *)os_malloc(sizeof(struct state));
     init_state_machine(global_uart_state);
     global_uart_state->read_cb = read_byte_cb;
