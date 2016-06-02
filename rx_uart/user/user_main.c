@@ -8,9 +8,9 @@
 #include "driver/uart.h"
 #include "driver/uart_codec.h"
 #include "mem.h"
+#include "c_types.h"
 
-
-struct state *global_uart_state;
+struct uart_codec_state *global_uart_state;
 
 
 
@@ -29,7 +29,7 @@ LOCAL void ICACHE_FLASH_ATTR uart1_sendStr(const char *str)
     }
 }
 
-byte my_flush_cb(struct state *s) {
+byte my_flush_cb(struct uart_codec_state *s) {
     char my_buf[200];
     os_sprintf(my_buf, "received %u bytes\n", s->already_read);
     uart1_sendStr(my_buf);
@@ -62,8 +62,8 @@ void ICACHE_FLASH_ATTR
 user_init()
 {
     uart_init(BIT_RATE_115200, BIT_RATE_115200);
-    global_uart_state = (struct state *)os_malloc(sizeof(struct state));
-    init_state_machine(global_uart_state);
+    global_uart_state = (struct uart_codec_state *)os_malloc(sizeof(struct uart_codec_state));
+    uart_codec_init(global_uart_state);
     global_uart_state->read_cb = read_byte_cb;
     global_uart_state->flush_cb = my_flush_cb;
         

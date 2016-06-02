@@ -9,7 +9,7 @@
 #include "driver/uart_codec.h"
 #include "mem.h"
 
-struct state *global_uart_state;
+struct uart_codec_state *global_uart_state;
 
 #define user_procTaskPrio        0
 #define user_procTaskQueueLen    1
@@ -48,7 +48,7 @@ void uart_rx_task(os_event_t *events) {
     }
 }
 
-byte send_datagram(struct state *s) {
+byte send_datagram(struct uart_codec_state *s) {
     conn.type = ESPCONN_UDP;
     conn.state = ESPCONN_NONE;
     conn.proto.udp = &udp;
@@ -125,8 +125,8 @@ user_init()
 {
 
     uart_init(BIT_RATE_115200, BIT_RATE_115200);
-    global_uart_state = (struct state*)os_malloc(sizeof(struct state));
-    init_state_machine(global_uart_state);
+    global_uart_state = (struct uart_codec_state*)os_malloc(sizeof(struct uart_codec_state));
+    uart_codec_init(global_uart_state);
     global_uart_state->read_cb = read_byte_cb;
     global_uart_state->flush_cb = send_datagram;
 

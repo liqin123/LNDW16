@@ -11,12 +11,12 @@ typedef unsigned char byte;
 
 byte TEST_SEQUENCE[15]; // adapt length length (stupid compiler)
 byte TEST_SEQUENCE_LEN;
-struct state;
-typedef void state_fn(struct state *);
+struct uart_codec_state;
+typedef void state_fn(struct uart_codec_state *);
 
-void init_state_machine(struct state *);
+void uart_codec_init(struct uart_codec_state *);
 
-struct state {
+struct uart_codec_state {
     state_fn *next;
     byte next_packet_size;
     byte buffer[BUFFER_SIZE];
@@ -24,11 +24,11 @@ struct state {
     byte fifo_len;
     byte already_read;
     byte (*read_cb)(void); // callback by user, provides next byte
-    byte (*flush_cb)(struct state *s); // callback invoked when we read a valid STOP byte
+    byte (*flush_cb)(struct uart_codec_state *s); // callback invoked when we read a valid STOP byte
     
 };
 
-int send_packet(const byte buffer[], byte len, void (*send_cb)(byte[], byte len));
+int uart_codec_send_packet(const byte buffer[], byte len, void (*send_cb)(byte[], byte len));
 
 
 #endif // _UART_CODEC_H

@@ -11,20 +11,18 @@ byte escape_byte = ESCAPE_BYTE_CASE;
 
 byte TEST_SEQUENCE[] = {3, 1, 4, 1, 2, 2, 7, 1, 5, 10, START_BYTE_CASE, 7, STOP_BYTE_CASE, 15, 100}; 
 byte TEST_SEQUENCE_LEN = sizeof(TEST_SEQUENCE);
-void debug(const char *function_name, struct state *s) {
+void debug(const char *function_name, struct uart_codec_state *s) {
 
     //os_printf("%s\n", function_name);
 }
 
-byte read_next_byte(struct state *s) {
+byte read_next_byte(struct uart_codec_state *s) {
     debug(__func__, s);
     s->fifo_len--;
     return s->read_cb();
 }
 
-
-
-void reset_state(struct state *s) {
+void reset_state(struct uart_codec_state *s) {
     debug(__func__, s);
     s->already_read = 0;
     s->next_packet_size = 0;
@@ -32,7 +30,7 @@ void reset_state(struct state *s) {
 }
 
 
-void start_fn(struct state *s) {
+void start_fn(struct uart_codec_state *s) {
     debug(__func__, s);
     byte current_byte = read_next_byte(s);
     switch (current_byte) {
@@ -44,7 +42,7 @@ void start_fn(struct state *s) {
     }
 }
 
-void length_fn(struct state *s) {
+void length_fn(struct uart_codec_state *s) {
     debug(__func__, s);
     byte current_byte = read_next_byte(s);
     switch (current_byte) {
@@ -62,14 +60,14 @@ void length_fn(struct state *s) {
     }
 }
 
-void length_esc_fn(struct state *s) {
+void length_esc_fn(struct uart_codec_state *s) {
     debug(__func__, s);
     s->next_packet_size = read_next_byte(s);
     s->next = read_data_fn;
 }
 
 // Optimization: in der Funktion selbst loopen (spart function calls)
-void read_data_fn(struct state *s) {
+void read_data_fn(struct uart_codec_state *s) {
     debug(__func__, s);
     byte current_byte = read_next_byte(s);
     switch (current_byte) {
@@ -96,7 +94,7 @@ void read_data_fn(struct state *s) {
 }
 
 // writes the byte after an escape without interpretation
-void read_data_esc_fn(struct state *s) {
+void read_data_esc_fn(struct uart_codec_state *s) {
     debug(__func__, s);
     s->next = read_data_fn;
     byte current_byte = read_next_byte(s);
@@ -104,7 +102,7 @@ void read_data_esc_fn(struct state *s) {
     s->already_read++;
 }
 
-void init_state_machine(struct state *s) {
+void uart_codec_init(struct uart_codec_state *s) {
     s->next = start_fn;
 }
 
@@ -137,7 +135,7 @@ byte escape_buffer(const byte src[], byte dst[], byte len) {
     return new_len;
 }
 
-int send_packet(const byte buffer[], byte len, void (*send_cb)(byte[], byte len)) {
+int uart_codec_send_packet(const byte buffer[], byte len, void (*send_cb)(byte[], byte len)) {
     int byte_counter=0;
     byte *payload_buf = (byte *)os_malloc(len*2);
     byte actual_length_payload = escape_buffer(buffer, payload_buf, len);
