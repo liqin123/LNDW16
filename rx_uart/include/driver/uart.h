@@ -197,7 +197,7 @@ void  Uart_rx_buff_enq();
 void  uart_rx_intr_enable(uint8 uart_no);
 void  uart_rx_intr_disable(uint8 uart_no);
 void uart0_tx_buffer(uint8 *buf, uint16 len);
-void uart1_tx_buffer(uint8 *buf, uint16 len);
+void uart1_tx_buffer(uint8 *buf, uint8 len);
 
 //==============================================
 #define FUNC_UART0_CTS 4
