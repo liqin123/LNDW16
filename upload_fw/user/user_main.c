@@ -161,6 +161,7 @@ user_init()
     wifi_station_set_config(&stationConf);
     wifi_station_connect();
     wifi_station_set_auto_connect(true);
+    os_printf("last custom mac_byte=%x\n", new_mac_addr);
 
     wifi_set_event_handler_cb(wifi_callback);
     os_printf("bla blub\n");
