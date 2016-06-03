@@ -16,7 +16,13 @@ struct uart_codec_state *global_uart_state;
 
 #define MAC_SIZE 6
 uint8 original_mac_addr [MAC_SIZE] = {0, 0, 0, 0, 0, 0};
-uint8 new_mac_addr[MAC_SIZE] = {0x00, 0x11, 0x22, 0x33, 0x44, 0x56};
+
+#ifndef CUSTOM_MAC
+uint8 new_mac_addr[MAC_SIZE] = {0x00, 0x11, 0x22, 0x33, 0x44, 0x55};
+#else // CUSTOM_MAC
+uint8 new_mac_addr[MAC_SIZE] = {0x00, 0x11, 0x22, 0x33, 0x44, CUSTOM_MAC};
+#endif // CUSTOM_MAC
+
 uint8 ap_bssid[MAC_SIZE] = {0, 0, 0, 0, 0, 0};
 
 const uint8 DST_IP[4] = {141, 76, 46, 34};
@@ -24,6 +30,7 @@ const uint16 DST_PORT = 3333;
 
 struct espconn conn;
 esp_udp udp;
+
 
 LOCAL uint8 get_fifo_len() {
     return (READ_PERI_REG(UART_STATUS(UART0))>>UART_RXFIFO_CNT_S)&UART_RXFIFO_CNT;
