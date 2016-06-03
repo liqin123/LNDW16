@@ -43,7 +43,8 @@ def main():
         subprocess.Popen(MAKE + [cpp_flag], env=my_env).wait()
         # create the subdir and copy the files
         sub_dump_dir = FW_DUMP_DIR+hex(last_mac_byte)
-        os.mkdir(sub_dump_dir)
+        if (not os.path.exists(sub_dump_dir)):
+            os.mkdir(sub_dump_dir)
         shutil.copy("firmware/0x00000.bin", sub_dump_dir)
         shutil.copy("firmware/0x40000.bin", sub_dump_dir)
 main()
