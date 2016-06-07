@@ -2,7 +2,7 @@
 
 """
 Pass a value to the makefile
-CPPFLAGS=-DDEVID=
+EXTRA_CFLAGS=-DDEVID=
 set environment variable correctly
 PATH=$PATH:/media/intern/Coding/..
 
@@ -37,9 +37,9 @@ def main():
         if (not os.path.exists(FW_DUMP_DIR)):
             os.mkdir(FW_DUMP_DIR)
         lmb = hex(last_mac_byte)[2:].zfill(2)
-        cpp_flag = "CPPFLAGS=-DDEVID=0x" + lmb
-        print "CPPFLAGS: " + cpp_flag
-        subprocess.Popen(MAKE + [cpp_flag], env=my_env).wait()
+        extra_cflags = "EXTRA_CFLAGS=-DDEVID=0x" + lmb
+        print "EXTRA_CFLAGS: " + extra_cflags
+        subprocess.Popen(MAKE + [extra_cflags], env=my_env).wait()
         # create the subdir and copy the files
         sub_dump_dir = FW_DUMP_DIR + lmb
         if (not os.path.exists(sub_dump_dir)):
