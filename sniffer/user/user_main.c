@@ -310,10 +310,6 @@ promisc_cb(uint8 *buffer, uint16 length)
         return;
     }
     // HIER!! HIER!!! VERSENDE MICH!
-    uint8 buffer_with_prefix[] = (uint8[])os_malloc(BUFFER_SIZE);
-    uint8 buffer_offset = 12;
-    memcpy(buffer_with_prefix+buffer_offset, buffer, length +buffer_offset+1);
-
     uart_codec_send_packet(buffer, (uint8)length + buffer_offset+1, uart1_tx_buffer);
 
 #ifdef DEBUG
