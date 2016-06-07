@@ -38,16 +38,15 @@ def main():
     for last_mac_byte in range(NUM_OF_ESPS):
         # hack: run 'make clean' each time to ensure that the firmware is actually rebuild. Use touch instead?
         subprocess.Popen(MAKE_CLEAN).wait()
-        # firmwares will be stored under "FW_DUMP_DIR/0xYY"
+        # firmwares will be stored under "FW_DUMP_DIR/fw_YY"
         if (not os.path.exists(FW_DUMP_DIR)):
             os.mkdir(FW_DUMP_DIR)
         cpp_flag = "CPPFLAGS=-DMYFLAG="+MAC_PREFIX+hex(last_mac_byte)
         subprocess.Popen(MAKE + [cpp_flag], env=my_env).wait()
         # create the subdir and copy the files
-        sub_dump_dir = FW_DUMP_DIR+hex(last_mac_byte)
+        sub_dump_dir = FW_DUMP_DIR+hex(last_mac_byte)[2:].zfill(2)
         if (not os.path.exists(sub_dump_dir)):
             os.mkdir(sub_dump_dir)
         shutil.copy("firmware/0x00000.bin", sub_dump_dir)
         shutil.copy("firmware/0x40000.bin", sub_dump_dir)
 main()
-
