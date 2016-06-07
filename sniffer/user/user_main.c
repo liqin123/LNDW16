@@ -314,7 +314,7 @@ promisc_cb(uint8 *buffer, uint16 length)
     uint8 buffer_offset = 12;
     memcpy(buffer_with_prefix+buffer_offset, buffer, length +buffer_offset+1);
 
-    send_packet(buffer, (uint8)length + buffer_offset+1, uart1_tx_buffer);
+    uart_codec_send_packet(buffer, (uint8)length + buffer_offset+1, uart1_tx_buffer);
 
 #ifdef DEBUG
     cs[ChannelIndex]++;
