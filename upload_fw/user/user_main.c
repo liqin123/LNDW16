@@ -18,11 +18,10 @@ struct uart_codec_state *global_uart_state;
 uint8 original_mac_addr [MAC_SIZE] = {0, 0, 0, 0, 0, 0};
 
 #ifndef CUSTOM_MAC
-uint8 new_mac_addr[MAC_SIZE] = {0x00, 0x11, 0x22, 0x33, 0x44, 0x55};
-#else // CUSTOM_MAC
-uint8 new_mac_addr[MAC_SIZE] = {0x00, 0x11, 0x22, 0x33, 0x44, CUSTOM_MAC};
+#define CUSTOM_MAC 0x55
 #endif // CUSTOM_MAC
 
+uint8 new_mac_addr[MAC_SIZE] = {0x00, 0x11, 0x22, 0x33, 0x44, CUSTOM_MAC};
 uint8 ap_bssid[MAC_SIZE] = {0, 0, 0, 0, 0, 0};
 
 const uint8 DST_IP[4] = {141, 76, 46, 34};
@@ -79,8 +78,16 @@ byte send_datagram(struct uart_codec_state *s) {
             }
     }
 
-    // potential overflow if we reconnect more than 10^10 times (but int size?)
-    switch(espconn_send(&conn, s->buffer, s->already_read)) {
+    uint8 *buffer_with_prefix = (uint8*)os_malloc(BUFFER_SIZE);
+    uint8 buffer_offset = 13; 
+    uint8 original_mac_offset = 6;
+    uint8 id_offset = 12;
+    memcpy(buffer_with_prefix, ap_bssid, MAC_SIZE);
+    memcpy(buffer_with_prefix+original_mac_offset, original_mac_addr, MAC_SIZE);
+    buffer_with_prefix[id_offset] = CUSTOM_MAC;
+    memcpy(buffer_with_prefix+buffer_offset, s->buffer, s->already_read);
+    
+    switch(espconn_send(&conn, buffer_with_prefix, s->already_read+buffer_offset)) {
         case ESPCONN_ARG:
             {
                 os_printf("_send: invalid argument\n");
@@ -98,6 +105,17 @@ byte send_datagram(struct uart_codec_state *s) {
 void ICACHE_FLASH_ATTR
 wifi_callback( System_Event_t *evt ) {
     os_printf("Got an event!\n");
+    switch(wifi_get_sleep_type()) {
+    case NONE_SLEEP_T:
+	os_printf("none_sleep_t\n");
+	break;
+    case LIGHT_SLEEP_T:
+	os_printf("light_sleep_t\n");
+	break;
+    case MODEM_SLEEP_T:
+	os_printf("modem_sleep_t\n");
+	break;
+    }
     switch (evt->event) {
         case EVENT_STAMODE_CONNECTED:
             {
@@ -164,5 +182,6 @@ user_init()
     os_printf("last custom mac_byte=%x\n", new_mac_addr);
 
     wifi_set_event_handler_cb(wifi_callback);
+    wifi_set_sleep_type(LIGHT_SLEEP_T);
     os_printf("bla blub\n");
 }
