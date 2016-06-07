@@ -310,7 +310,7 @@ promisc_cb(uint8 *buffer, uint16 length)
         return;
     }
     // HIER!! HIER!!! VERSENDE MICH!
-    uart_codec_send_packet(buffer, (uint8)length + buffer_offset+1, uart1_tx_buffer);
+    uart_codec_send_packet(buffer, (uint8)length, uart1_tx_buffer);
 
 #ifdef DEBUG
     cs[ChannelIndex]++;
