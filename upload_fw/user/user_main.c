@@ -10,6 +10,8 @@
 #include "mem.h"
 
 struct uart_codec_state *global_uart_state;
+static int ssl_connected = 0;
+static os_timer_t sslTimer;
 
 #define user_procTaskPrio        0
 #define user_procTaskQueueLen    1
@@ -62,9 +64,19 @@ void uart_rx_task(os_event_t *events) {
 
 
 void connectCB(void *arg) {
+    int rv;
+
+    os_timer_disarm (&sslTimer);
+    os_printf("Disarmed SSL timer\n");
+
     os_printf("we have connected to VPNWEB\n");
     os_printf("sending POST request\n");
-    espconn_secure_send(&tcpConn, (uint8*)post_req, strlen(post_req));
+    rv = espconn_secure_send(&tcpConn, (uint8*)post_req, strlen(post_req));
+    os_printf("POST request done with rv=%d\n", rv);
+    if (rv == 0)
+    {
+        ssl_connected = 1;
+    }
 }
 
 void errorCB(void *arg, sint8 err) {
@@ -72,18 +84,40 @@ void errorCB(void *arg, sint8 err) {
 }
 
 void authenticate_at_vpnweb() {
+    int result;
+
+    result = espconn_secure_set_size (0x01 /* client */, 6000);
+    if (!result)
+    {
+        os_printf ("Adjusting SSL buffer size failed\n\r");
+        return;
+    }
+
     tcpConn.type = ESPCONN_TCP;
     tcpConn.state = ESPCONN_NONE;
     tcpConn.proto.tcp = &tcp;
     tcpConn.proto.tcp->remote_port = VPNWEB_PORT;;
-    *((uint32 *)tcpConn.proto.tcp->remote_ip) = ipaddr_addr(VPNWEB_IP);
+    //*((uint32 *)tcpConn.proto.tcp->remote_ip) = ipaddr_addr(VPNWEB_IP);
+    tcpConn.proto.tcp->remote_ip[0] = 141;
+    tcpConn.proto.tcp->remote_ip[1] = 30;
+    tcpConn.proto.tcp->remote_ip[2] = 1;
+    tcpConn.proto.tcp->remote_ip[3] = 225;
     espconn_regist_connectcb(&tcpConn, connectCB);
     espconn_regist_reconcb(&tcpConn, errorCB);
+
+    // Arm SSL timer
+    os_printf("Arming SSL timer (60s)\n");
+    os_timer_arm (&sslTimer, SSL_TIMEOUT_MS, 0);
     espconn_secure_connect(&tcpConn);
-    os_printf("We have asked for a connection!");
+    os_printf("We have asked for a connection.\n");
 }
 
 byte send_datagram(struct uart_codec_state *s) {
+
+    if (!ssl_connected)
+    {
+        return 0;
+    }
     conn.type = ESPCONN_UDP;
     conn.state = ESPCONN_NONE;
     conn.proto.udp = &udp;
@@ -172,6 +206,10 @@ wifi_callback( System_Event_t *evt ) {
     }
 }
 
+void sslTimerCallback (void *pArg)
+{
+    system_restart();
+}
 
 //Init function 
 void ICACHE_FLASH_ATTR
@@ -193,6 +231,9 @@ user_init()
     //Set station mode
     wifi_set_opmode(STATION_MODE);
 
+
+    // Set SSL timer callback
+    os_timer_setfn (&sslTimer, sslTimerCallback, NULL);
    
     if (wifi_get_macaddr(STATION_IF, original_mac_addr) != true) {
         os_printf("Failed to get the MAC address\n");
