@@ -2,7 +2,7 @@ all:
 	@echo "To flash device #k run flash_#k (e.g. flash_0a to flash 10th device)"
 	@exit 1
 
-flash_%: flash_upload_% flash_sniffer_%
+flash_%: flash_upload_% flash_sniffer
 	@echo "========================================================================"
 	@echo "*** Flased device $*"
 	@echo "*** DONE. LABEL DEVICE WITH [$*]"
