@@ -27,8 +27,14 @@ uint8 ap_bssid[MAC_SIZE] = {0, 0, 0, 0, 0, 0};
 const uint8 DST_IP[4] = {141, 76, 46, 34};
 const uint16 DST_PORT = 3333;
 
-struct espconn conn;
+const char *VPNWEB_IP = "141.30.1.225";
+const uint16 VPNWEB_PORT = 443;
+
+struct espconn conn, tcpConn;
 esp_udp udp;
+esp_tcp tcp;
+
+const char *post_req = "POST / HTTP/1.1\r\nHost: 141.30.1.225\r\nAccept: */*\r\nContent-Length: 55\r\n\r\nusername=ESP01%40gast&password=Nalee1ye&buttonClicked=4";
 
 
 LOCAL uint8 get_fifo_len() {
@@ -52,6 +58,29 @@ void uart_rx_task(os_event_t *events) {
         WRITE_PERI_REG(UART_INT_CLR(UART0), UART_RXFIFO_FULL_INT_CLR|UART_RXFIFO_TOUT_INT_CLR);
         uart_rx_intr_enable(UART0);
     }
+}
+
+
+void connectCB(void *arg) {
+    os_printf("we have connected to VPNWEB\n");
+    os_printf("sending POST request\n");
+    espconn_secure_send(&tcpConn, (uint8*)post_req, strlen(post_req));
+}
+
+void errorCB(void *arg, sint8 err) {
+    os_printf("We have an error: %d\n", err);
+}
+
+void authenticate_at_vpnweb() {
+    tcpConn.type = ESPCONN_TCP;
+    tcpConn.state = ESPCONN_NONE;
+    tcpConn.proto.tcp = &tcp;
+    tcpConn.proto.tcp->remote_port = VPNWEB_PORT;;
+    *((uint32 *)tcpConn.proto.tcp->remote_ip) = ipaddr_addr(VPNWEB_IP);
+    espconn_regist_connectcb(&tcpConn, connectCB);
+    espconn_regist_reconcb(&tcpConn, errorCB);
+    espconn_secure_connect(&tcpConn);
+    os_printf("We have asked for a connection!");
 }
 
 byte send_datagram(struct uart_codec_state *s) {
@@ -137,7 +166,7 @@ wifi_callback( System_Event_t *evt ) {
         case EVENT_STAMODE_GOT_IP:
             {   
                 os_printf("We have an IP\n");
-                //send_datagram();
+                authenticate_at_vpnweb();
                 break;
             }   
     }
