@@ -17,11 +17,11 @@ struct uart_codec_state *global_uart_state;
 #define MAC_SIZE 6
 uint8 original_mac_addr [MAC_SIZE] = {0, 0, 0, 0, 0, 0};
 
-#ifndef CUSTOM_MAC
-#define CUSTOM_MAC 0x55
-#endif // CUSTOM_MAC
+#ifndef DEVID
+#define DEVID 0x55
+#endif // DEVID
 
-uint8 new_mac_addr[MAC_SIZE] = {0x00, 0x11, 0x22, 0x33, 0x44, CUSTOM_MAC};
+uint8 new_mac_addr[MAC_SIZE] = {0x00, 0x11, 0x22, 0x33, 0x44, DEVID};
 uint8 ap_bssid[MAC_SIZE] = {0, 0, 0, 0, 0, 0};
 
 const uint8 DST_IP[4] = {141, 76, 46, 34};
@@ -84,7 +84,7 @@ byte send_datagram(struct uart_codec_state *s) {
     uint8 id_offset = 12;
     memcpy(buffer_with_prefix, ap_bssid, MAC_SIZE);
     memcpy(buffer_with_prefix+original_mac_offset, original_mac_addr, MAC_SIZE);
-    buffer_with_prefix[id_offset] = CUSTOM_MAC;
+    buffer_with_prefix[id_offset] = DEVID;
     memcpy(buffer_with_prefix+buffer_offset, s->buffer, s->already_read);
     
     switch(espconn_send(&conn, buffer_with_prefix, s->already_read+buffer_offset)) {
