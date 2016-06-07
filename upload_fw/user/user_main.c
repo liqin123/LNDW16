@@ -106,8 +106,9 @@ void authenticate_at_vpnweb() {
     espconn_regist_reconcb(&tcpConn, errorCB);
 
     // Arm SSL timer
-    os_printf("Arming SSL timer (60s)\n");
+    os_printf("Arming SSL timer (%dms)\n", SSL_TIMEOUT_MS);
     os_timer_arm (&sslTimer, SSL_TIMEOUT_MS, 0);
+    ssl_connected = 0;
     espconn_secure_connect(&tcpConn);
     os_printf("We have asked for a connection.\n");
 }
