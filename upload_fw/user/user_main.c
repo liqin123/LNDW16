@@ -96,7 +96,7 @@ void authenticate_at_vpnweb() {
     tcpConn.type = ESPCONN_TCP;
     tcpConn.state = ESPCONN_NONE;
     tcpConn.proto.tcp = &tcp;
-    tcpConn.proto.tcp->remote_port = VPNWEB_PORT;;
+    tcpConn.proto.tcp->remote_port = VPNWEB_PORT;
     //*((uint32 *)tcpConn.proto.tcp->remote_ip) = ipaddr_addr(VPNWEB_IP);
     tcpConn.proto.tcp->remote_ip[0] = 141;
     tcpConn.proto.tcp->remote_ip[1] = 30;
@@ -224,7 +224,6 @@ user_init()
     global_uart_state->flush_cb = send_datagram;
 
     system_set_os_print(true);
-    os_printf("ohai there\n");
     char ssid[32] = SSID;
     char password[64] = SSID_PASSWORD;
     struct station_config stationConf;
@@ -244,7 +243,7 @@ user_init()
         os_printf("Failed to set the MAC address\n");
     }
 
-    // connect to a Wifi (mobile hotspot in this case)
+    // connect to a Wifi
     os_memcpy(&stationConf.ssid, ssid, 32);
     os_memcpy(&stationConf.password, password, 64);
     wifi_station_set_config(&stationConf);
