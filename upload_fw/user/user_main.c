@@ -217,7 +217,7 @@ void ICACHE_FLASH_ATTR
 user_init()
 {
 
-    uart_init(BIT_RATE_115200, BIT_RATE_115200);
+    uart_init(BIT_RATE_460800, BIT_RATE_115200);
     global_uart_state = (struct uart_codec_state*)os_malloc(sizeof(struct uart_codec_state));
     uart_codec_init(global_uart_state);
     global_uart_state->read_cb = read_byte_cb;

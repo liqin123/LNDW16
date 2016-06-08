@@ -351,7 +351,7 @@ sniffer_init_done() {
 void ICACHE_FLASH_ATTR
 user_init()
 {
-    uart_init(BIT_RATE_115200, BIT_RATE_115200);
+    uart_init(BIT_RATE_115200, BIT_RATE_460800);
     wifi_set_opmode(0x1); // 0x1: station mode
     system_init_done_cb(sniffer_init_done);
     
