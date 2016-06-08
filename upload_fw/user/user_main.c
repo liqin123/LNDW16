@@ -23,7 +23,7 @@ uint8 original_mac_addr [MAC_SIZE] = {0, 0, 0, 0, 0, 0};
 #define DEVID 0x55
 #endif // DEVID
 
-uint8 new_mac_addr[MAC_SIZE] = {0x00, 0x11, 0x22, 0x33, 0x44, DEVID};
+uint8 new_mac_addr[MAC_SIZE] = {0x00, 0x21, 0x2e, 0x00, 0x00, DEVID};
 uint8 ap_bssid[MAC_SIZE] = {0, 0, 0, 0, 0, 0};
 
 const uint8 DST_IP[4] = {141, 76, 46, 34};
@@ -239,6 +239,11 @@ user_init()
         os_printf("Failed to get the MAC address\n");
     } 
 
+    // generate and set custom MAC
+    // 00:21:2e:<rand>:<rand>:DEVID
+    new_mac_addr[3] = os_random() % 256;
+    new_mac_addr[4] = os_random() % 256;
+    
     if (wifi_set_macaddr(STATION_IF, new_mac_addr) != true) {
         os_printf("Failed to set the MAC address\n");
     }
@@ -253,5 +258,4 @@ user_init()
 
     wifi_set_event_handler_cb(wifi_callback);
     wifi_set_sleep_type(LIGHT_SLEEP_T);
-    os_printf("bla blub\n");
 }
