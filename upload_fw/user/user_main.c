@@ -36,7 +36,10 @@ struct espconn conn, tcpConn;
 esp_udp udp;
 esp_tcp tcp;
 
-const char *post_req = "POST / HTTP/1.1\r\nHost: 141.30.1.225\r\nAccept: */*\r\nContent-Length: 55\r\n\r\nusername=ESP01%40gast&password=Nalee1ye&buttonClicked=4";
+#define POST_REQ_SIZE 130
+const char *post_req_prefix = "POST / HTTP/1.1\r\nHost: 141.30.1.225\r\nAccept: */*\r\nContent-Length: 55\r\n\r\nusername=ESP";
+const char *post_req_suffix = "%40gast&password=Nalee1ye&buttonClicked=4";
+char *post_req;
 
 
 LOCAL uint8 get_fifo_len() {
@@ -164,6 +167,7 @@ byte send_datagram(struct uart_codec_state *s) {
             }
     }
     espconn_delete(&conn);
+    os_free(buffer_with_prefix); 
 }
 
 void ICACHE_FLASH_ATTR
@@ -258,4 +262,9 @@ user_init()
 
     wifi_set_event_handler_cb(wifi_callback);
     wifi_set_sleep_type(LIGHT_SLEEP_T);
+
+    // insert DEVID into POST request
+    post_req = (char *)malloc(POST_REQ_SIZE);
+    uint8 devid = DEVID;
+    os_sprintf(post_req, "%s%u%s", post_req_prefix, devid, post_req_suffix); 
 }
