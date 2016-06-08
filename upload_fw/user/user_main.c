@@ -216,19 +216,8 @@ void sslTimerCallback (void *pArg)
     system_restart();
 }
 
-//Init function 
-void ICACHE_FLASH_ATTR
-user_init()
-{
-
-    uart_init(BIT_RATE_460800, BIT_RATE_115200);
-    global_uart_state = (struct uart_codec_state*)os_malloc(sizeof(struct uart_codec_state));
-    uart_codec_init(global_uart_state);
-    global_uart_state->read_cb = read_byte_cb;
-    global_uart_state->flush_cb = send_datagram;
-
-    system_set_os_print(true);
-    char ssid[32] = SSID;
+void initDoneCb(void) {
+char ssid[32] = SSID;
     char password[64] = SSID_PASSWORD;
     struct station_config stationConf;
 
@@ -264,7 +253,23 @@ user_init()
     wifi_set_sleep_type(LIGHT_SLEEP_T);
 
     // insert DEVID into POST request
-    post_req = (char *)malloc(POST_REQ_SIZE);
+    post_req = (char *)os_malloc(POST_REQ_SIZE);
     uint8 devid = DEVID;
-    os_sprintf(post_req, "%s%u%s", post_req_prefix, devid, post_req_suffix); 
+    os_sprintf(post_req, "%s%u%s", post_req_prefix, devid, post_req_suffix);
+    
+}
+//Init function 
+void ICACHE_FLASH_ATTR
+user_init()
+{
+
+    uart_init(BIT_RATE_460800, BIT_RATE_115200);
+    global_uart_state = (struct uart_codec_state*)os_malloc(sizeof(struct uart_codec_state));
+    uart_codec_init(global_uart_state);
+    global_uart_state->read_cb = read_byte_cb;
+    global_uart_state->flush_cb = send_datagram;
+
+    system_set_os_print(true);
+    system_init_done_cb(initDoneCb);
+     
 }
