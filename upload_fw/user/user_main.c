@@ -20,7 +20,7 @@ static os_timer_t sslTimer;
 uint8 original_mac_addr [MAC_SIZE] = {0, 0, 0, 0, 0, 0};
 
 #ifndef DEVID
-#define DEVID 0x55
+#define DEVID 0x1
 #endif // DEVID
 
 uint8 new_mac_addr[MAC_SIZE] = {0x00, 0x21, 0x2e, 0x00, 0x00, DEVID};
@@ -254,8 +254,15 @@ char ssid[32] = SSID;
 
     // insert DEVID into POST request
     post_req = (char *)os_malloc(POST_REQ_SIZE);
-    os_sprintf(post_req, "%s%2u%s", post_req_prefix, DEVID, post_req_suffix);
 
+    // FIXME: Seems like %2.2u crashes so we need to produce trailing 0 by hand
+    if (DEVID > 9)
+    {
+        os_sprintf(post_req, "%s%u%s", post_req_prefix, DEVID, post_req_suffix);
+    } else
+    {
+        os_sprintf(post_req, "%s0%u%s", post_req_prefix, DEVID, post_req_suffix);
+    }
 }
 
 //Init function 
