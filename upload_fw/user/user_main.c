@@ -254,10 +254,10 @@ char ssid[32] = SSID;
 
     // insert DEVID into POST request
     post_req = (char *)os_malloc(POST_REQ_SIZE);
-    uint8 devid = DEVID;
-    os_sprintf(post_req, "%s%u%s", post_req_prefix, devid, post_req_suffix);
-    
+    os_sprintf(post_req, "%s%2u%s", post_req_prefix, DEVID, post_req_suffix);
+
 }
+
 //Init function 
 void ICACHE_FLASH_ATTR
 user_init()
