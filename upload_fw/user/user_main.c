@@ -73,7 +73,7 @@ void connectCB(void *arg) {
     os_printf("Disarmed SSL timer\n");
 
     os_printf("we have connected to VPNWEB\n");
-    os_printf("sending POST request\n");
+    os_printf("sending POST request:\n==================\n%s\n==================\n", post_req);
     rv = espconn_secure_send(&tcpConn, (uint8*)post_req, strlen(post_req));
     os_printf("POST request done with rv=%d\n", rv);
     if (rv == 0)
