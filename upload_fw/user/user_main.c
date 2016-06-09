@@ -12,6 +12,7 @@
 struct uart_codec_state *global_uart_state;
 static int ssl_connected = 0;
 static os_timer_t sslTimer;
+static int uart_counter = 0;
 
 #define user_procTaskPrio        0
 #define user_procTaskQueueLen    1
@@ -23,6 +24,7 @@ uint8 original_mac_addr [MAC_SIZE] = {0, 0, 0, 0, 0, 0};
 #define DEVID 0x1
 #endif // DEVID
 
+static int datagram_count = 0;
 uint8 new_mac_addr[MAC_SIZE] = {0x00, 0x21, 0x2e, 0x00, 0x00, DEVID};
 uint8 ap_bssid[MAC_SIZE] = {0, 0, 0, 0, 0, 0};
 
@@ -50,21 +52,110 @@ LOCAL uint8 read_byte_cb() {
     return READ_PERI_REG(UART_FIFO(UART0)) & 0xFF;
 }
 
-/*
- * Receives the characters from the serial port.
- */
-void uart_rx_task(os_event_t *events) {
-    if(events->sig == 0) { 
-	global_uart_state->fifo_len = get_fifo_len();
-	while(global_uart_state->fifo_len > 0) {
-	    global_uart_state->next(global_uart_state);
-	}
-	// reset UART interrupts       
-        WRITE_PERI_REG(UART_INT_CLR(UART0), UART_RXFIFO_FULL_INT_CLR|UART_RXFIFO_TOUT_INT_CLR);
-        uart_rx_intr_enable(UART0);
+#define CTL_START 0x5f
+#define CTL_STOP  0xa0
+#define CTL_ESC   0x55
+
+// FIXME: Localize
+#define BUFLEN 1000
+typedef enum { st_start, st_len, st_read, st_esc } state_t;
+typedef enum { r_done, r_running } result_t;
+
+typedef struct
+{
+    state_t state;
+    uint8 length;
+    uint8 pos;
+    uint8 buffer[BUFLEN];
+} uartrx_fsm_t;
+
+static uartrx_fsm_t uart1rx_fsm = { .state = st_start, .length = 0, .pos = 0 };
+
+uint8 rx_step (uartrx_fsm_t *fsm, uint8 b)
+{
+    uint8 result = r_running;
+
+    //os_printf ("rx_step: state=%d, byte=%2x\n", fsm->state, b);
+
+    switch (fsm->state)
+    {
+        case st_start:
+            fsm->pos = 0;
+            fsm->length = 0;
+            if (b == CTL_START)
+            {
+                fsm->state = st_len;
+            } else
+            {
+                // Stay in start
+            }
+            break;
+
+        case st_len:
+            fsm->length = b;
+            fsm->state = st_read;
+            break;
+
+        case st_read:
+            if (b == CTL_ESC)
+            {
+                fsm->state = st_esc;
+            } else if (b == CTL_START)
+            {
+                fsm->state = st_len;
+            } else if (b == CTL_STOP)
+            {
+                fsm->state = st_start;
+                result = r_done;
+            } else
+            {
+                if (fsm->pos < BUFLEN)
+                {
+                    fsm->buffer[fsm->pos++] = b;
+                } else
+                {
+                    fsm->state = st_start;
+                    os_printf ("Buffer overflow\n");
+                }
+            }
+            break;
+
+        case st_esc:
+            fsm->state = st_read;
+            fsm->buffer[fsm->pos++] = b;
+            break;
     }
+    return result;
 }
 
+void reset_uart_rx_intr (void)
+{
+    WRITE_PERI_REG(UART_INT_CLR(UART0), UART_RXFIFO_FULL_INT_CLR|UART_RXFIFO_TOUT_INT_CLR);
+    uart_rx_intr_enable(UART0);
+}
+
+void uart_rx_task(os_event_t *events)
+{
+    int i, fifo_len;
+    uint8 data_byte, result;
+
+    // os_printf ("Event %d\n", events->sig);
+
+    if (events->sig == 0)
+    { 
+        fifo_len = get_fifo_len();
+        for (i = 0; i < fifo_len; i++)
+        {
+            data_byte = read_byte_cb();
+            result = rx_step (&uart1rx_fsm, data_byte);
+            if (result == r_done)
+            {
+                os_printf ("Done reading UART [%d] len field=%d, bytes read=%d\n", ++uart_counter, uart1rx_fsm.length, uart1rx_fsm.pos);
+            }
+        }
+        reset_uart_rx_intr ();
+    }
+}
 
 void connectCB(void *arg) {
     int rv;
@@ -120,8 +211,10 @@ byte send_datagram(struct uart_codec_state *s) {
 
     if (!ssl_connected)
     {
+        os_printf ("Ignore datagram - no SSL\n");
         return 0;
     }
+
     conn.type = ESPCONN_UDP;
     conn.state = ESPCONN_NONE;
     conn.proto.udp = &udp;
@@ -166,6 +259,8 @@ byte send_datagram(struct uart_codec_state *s) {
                 break;
             }
     }
+
+    os_printf ("Sent datagram #%d\n", ++datagram_count);
     espconn_delete(&conn);
     os_free(buffer_with_prefix); 
 }
@@ -269,13 +364,7 @@ char ssid[32] = SSID;
 void ICACHE_FLASH_ATTR
 user_init()
 {
-
-    uart_init(BIT_RATE_460800, BIT_RATE_115200);
-    global_uart_state = (struct uart_codec_state*)os_malloc(sizeof(struct uart_codec_state));
-    uart_codec_init(global_uart_state);
-    global_uart_state->read_cb = read_byte_cb;
-    global_uart_state->flush_cb = send_datagram;
-
+    uart_init(BIT_RATE_115200, BIT_RATE_115200);
     system_set_os_print(true);
     system_init_done_cb(initDoneCb);
      

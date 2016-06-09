@@ -18,6 +18,7 @@ os_event_t    user_procTaskQueue[user_procTaskQueueLen];
 #define printmac(buf, i) os_printf("\t%02X:%02X:%02X:%02X:%02X:%02X", buf[i+0], buf[i+1], buf[i+2], \
 				    buf[i+3], buf[i+4], buf[i+5])
 
+static unsigned int snafu = 0;
 static volatile os_timer_t channelHop_timer;
 
 static void loop(os_event_t *events);
@@ -27,6 +28,7 @@ static int cs[MAX_CHANNELS];
 static int iters;
 static int watermark;
 static int counter;
+static int sent_counter = 0;
 static struct cache_entry cache[MAX_CACHE_ENTRIES];
 
 // dummy
@@ -310,6 +312,7 @@ promisc_cb(uint8 *buffer, uint16 length)
         return;
     }
     // HIER!! HIER!!! VERSENDE MICH!
+    os_printf ("Sending packet %d\n", ++snafu);
     uart_codec_send_packet(buffer, (uint8)length, uart1_tx_buffer);
 
 #ifdef DEBUG
@@ -351,9 +354,10 @@ sniffer_init_done() {
 void ICACHE_FLASH_ATTR
 user_init()
 {
-    uart_init(BIT_RATE_115200, BIT_RATE_460800);
+    uart_init(BIT_RATE_115200, BIT_RATE_115200);
     wifi_set_opmode(0x1); // 0x1: station mode
     system_init_done_cb(sniffer_init_done);
+    system_set_os_print(true);
     
     os_timer_disarm(&channelHop_timer);
     os_timer_setfn(&channelHop_timer, (os_timer_func_t *) hop_channel, NULL);
