@@ -368,7 +368,7 @@ char ssid[32] = SSID;
 void ICACHE_FLASH_ATTR
 user_init()
 {
-    uart_init(BIT_RATE_115200, BIT_RATE_115200);
+    uart_init(BIT_RATE_460800, BIT_RATE_460800);
     system_set_os_print(true);
     system_init_done_cb(initDoneCb);
 }
