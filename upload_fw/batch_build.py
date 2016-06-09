@@ -36,8 +36,8 @@ def main():
         # firmwares will be stored under "FW_DUMP_DIR/fw_YY"
         if (not os.path.exists(FW_DUMP_DIR)):
             os.mkdir(FW_DUMP_DIR)
-        lmb = hex(last_mac_byte)[2:].zfill(2)
-        extra_cflags = "EXTRA_CFLAGS=-DDEVID=0x" + lmb
+        lmb = str(last_mac_byte)
+        extra_cflags = "EXTRA_CFLAGS=-DDEVID=" + lmb
         print "EXTRA_CFLAGS: " + extra_cflags
         subprocess.Popen(MAKE + [extra_cflags], env=my_env).wait()
         # create the subdir and copy the files
