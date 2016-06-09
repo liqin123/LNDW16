@@ -12,7 +12,11 @@
 struct uart_codec_state *global_uart_state;
 static int ssl_connected = 0;
 static os_timer_t sslTimer;
+static os_timer_t auth_timer;
 static int uart_counter = 0;
+static int got_ip = 0;
+
+void send_datagram (uint8 *msg, uint8 len);
 
 #define user_procTaskPrio        0
 #define user_procTaskQueueLen    1
@@ -151,6 +155,7 @@ void uart_rx_task(os_event_t *events)
             if (result == r_done)
             {
                 os_printf ("Done reading UART [%d] len field=%d, bytes read=%d\n", ++uart_counter, uart1rx_fsm.length, uart1rx_fsm.pos);
+                send_datagram (uart1rx_fsm.buffer, uart1rx_fsm.pos);
             }
         }
         reset_uart_rx_intr ();
@@ -171,13 +176,17 @@ void connectCB(void *arg) {
     {
         ssl_connected = 1;
     }
+
+    espconn_delete (&tcpConn);
+    os_timer_arm (&auth_timer, 900000, 0);
 }
 
 void errorCB(void *arg, sint8 err) {
     os_printf("We have an error: %d\n", err);
 }
 
-void authenticate_at_vpnweb() {
+void authenticate_wifi (void *arg)
+{
     int result;
 
     result = espconn_secure_set_size (0x01 /* client */, 6000);
@@ -207,12 +216,12 @@ void authenticate_at_vpnweb() {
     os_printf("We have asked for a connection.\n");
 }
 
-byte send_datagram(struct uart_codec_state *s) {
+void send_datagram (uint8 *msg, uint8 len) {
 
     if (!ssl_connected)
     {
         os_printf ("Ignore datagram - no SSL\n");
-        return 0;
+        return;
     }
 
     conn.type = ESPCONN_UDP;
@@ -238,16 +247,16 @@ byte send_datagram(struct uart_codec_state *s) {
             }
     }
 
-    uint8 *buffer_with_prefix = (uint8*)os_malloc(BUFFER_SIZE);
+    uint8 *buffer_with_prefix = (uint8*)os_malloc(len + 13);
     uint8 buffer_offset = 13; 
     uint8 original_mac_offset = 6;
     uint8 id_offset = 12;
     memcpy(buffer_with_prefix, ap_bssid, MAC_SIZE);
     memcpy(buffer_with_prefix+original_mac_offset, original_mac_addr, MAC_SIZE);
     buffer_with_prefix[id_offset] = DEVID;
-    memcpy(buffer_with_prefix+buffer_offset, s->buffer, s->already_read);
+    memcpy(buffer_with_prefix+buffer_offset, msg, len);
     
-    switch(espconn_send(&conn, buffer_with_prefix, s->already_read+buffer_offset)) {
+    switch(espconn_send(&conn, buffer_with_prefix, len + buffer_offset)) {
         case ESPCONN_ARG:
             {
                 os_printf("_send: invalid argument\n");
@@ -261,24 +270,13 @@ byte send_datagram(struct uart_codec_state *s) {
     }
 
     os_printf ("Sent datagram #%d\n", ++datagram_count);
-    espconn_delete(&conn);
-    os_free(buffer_with_prefix); 
+    espconn_delete (&conn);
+    os_free (buffer_with_prefix); 
 }
 
-void ICACHE_FLASH_ATTR
+void //ICACHE_FLASH_ATTR
 wifi_callback( System_Event_t *evt ) {
-    os_printf("Got an event!\n");
-    switch(wifi_get_sleep_type()) {
-    case NONE_SLEEP_T:
-	os_printf("none_sleep_t\n");
-	break;
-    case LIGHT_SLEEP_T:
-	os_printf("light_sleep_t\n");
-	break;
-    case MODEM_SLEEP_T:
-	os_printf("modem_sleep_t\n");
-	break;
-    }
+    //os_printf("Got an event!\n");
     switch (evt->event) {
         case EVENT_STAMODE_CONNECTED:
             {
@@ -300,7 +298,8 @@ wifi_callback( System_Event_t *evt ) {
         case EVENT_STAMODE_GOT_IP:
             {   
                 os_printf("We have an IP\n");
-                authenticate_at_vpnweb();
+                os_timer_arm (&auth_timer, 1000, 0);
+                got_ip = 1;
                 break;
             }   
     }
@@ -315,6 +314,18 @@ void initDoneCb(void) {
 char ssid[32] = SSID;
     char password[64] = SSID_PASSWORD;
     struct station_config stationConf;
+
+    // insert DEVID into POST request
+    post_req = (char *)os_malloc(POST_REQ_SIZE);
+
+    // FIXME: Seems like %2.2u crashes so we need to produce trailing 0 by hand
+    if (DEVID > 9)
+    {
+        os_sprintf(post_req, "%s%u%s", post_req_prefix, DEVID, post_req_suffix);
+    } else
+    {
+        os_sprintf(post_req, "%s0%u%s", post_req_prefix, DEVID, post_req_suffix);
+    }
 
     //Set station mode
     wifi_set_opmode(STATION_MODE);
@@ -341,23 +352,16 @@ char ssid[32] = SSID;
     os_memcpy(&stationConf.password, password, 64);
     wifi_station_set_config(&stationConf);
     wifi_station_connect();
+
     wifi_station_set_auto_connect(true);
     os_printf("last custom mac_byte=%x\n", new_mac_addr);
 
+    os_timer_disarm (&auth_timer);
+    os_timer_setfn (&auth_timer, (os_timer_func_t *) authenticate_wifi, NULL);
+
     wifi_set_event_handler_cb(wifi_callback);
-    wifi_set_sleep_type(LIGHT_SLEEP_T);
-
-    // insert DEVID into POST request
-    post_req = (char *)os_malloc(POST_REQ_SIZE);
-
-    // FIXME: Seems like %2.2u crashes so we need to produce trailing 0 by hand
-    if (DEVID > 9)
-    {
-        os_sprintf(post_req, "%s%u%s", post_req_prefix, DEVID, post_req_suffix);
-    } else
-    {
-        os_sprintf(post_req, "%s0%u%s", post_req_prefix, DEVID, post_req_suffix);
-    }
+         
+    //wifi_set_sleep_type(LIGHT_SLEEP_T);
 }
 
 //Init function 
@@ -367,5 +371,4 @@ user_init()
     uart_init(BIT_RATE_115200, BIT_RATE_115200);
     system_set_os_print(true);
     system_init_done_cb(initDoneCb);
-     
 }
