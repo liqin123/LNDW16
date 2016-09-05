@@ -55,10 +55,20 @@ struct sniffer_buf2
 	u16 len; //length of packet 
 };
 
+struct metadata
+{
+    uint8  addr[6];
+    uint8  rssi;
+    uint16 count;
+    uint16 age;
+};
+
 struct cache_entry
 {
-    uint8 addr[6];
-    int age;
+    int valid;
+    uint16 accumulated_rssi;
+    uint16 insert_time;
+    struct metadata data;
 };
 
 #define FRAME_TYPE_MANAGEMENT 0
