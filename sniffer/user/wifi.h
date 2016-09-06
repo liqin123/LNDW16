@@ -58,16 +58,15 @@ struct sniffer_buf2
 struct metadata
 {
     uint8  addr[6];
-    uint8  rssi;
+    signed char rssi;
     uint16 count;
     uint16 age;
 };
 
 struct cache_entry
 {
-    int valid;
-    uint16 accumulated_rssi;
-    uint16 insert_time;
+    long int accumulated_rssi;
+    unsigned long insert_time;
     struct metadata data;
 };
 

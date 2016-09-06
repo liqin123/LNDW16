@@ -20,6 +20,7 @@ os_event_t    user_procTaskQueue[user_procTaskQueueLen];
 
 static unsigned int packet_count = 0;
 static volatile os_timer_t channelHop_timer;
+static volatile os_timer_t ms_timer;
 
 static void loop(os_event_t *events);
 static void promisc_cb(uint8 *buf, uint16 len);
@@ -32,21 +33,6 @@ static struct cache_entry cache[MAX_CACHE_ENTRIES];
 void ICACHE_FLASH_ATTR uart_rx_task(os_event_t *events) {}
 // Initialize channel stats
 
-#ifdef DEBUG
-                                          
-static int iters;
-void init_stats (void)
-{
-    int i;
-
-    for (i = 0; i < MAX_CHANNELS; i++)
-    {
-        cs[i] = 0;
-    }
-    iters = 0;
-}
-#endif // DEBUG
-
 void cache_init (void)
 {
     bzero (cache, sizeof (cache));
@@ -57,20 +43,30 @@ void send_packet (struct cache_entry *entry, unsigned long now)
     entry->data.age  = now - entry->insert_time;
     entry->data.rssi = entry->accumulated_rssi / entry->data.count;
 
-    os_printf ("Sending packet %d\n", ++packet_count);
+    os_printf ("Sending packet #%d", ++packet_count);
+    printmac (entry->data.addr, 0);
+    os_printf (" age=%lu, count=%d, mean rssi=%d\n", entry->data.age, entry->data.count, entry->data.rssi);
+
     uart_codec_send_packet ((const void *)&entry->data, sizeof (struct metadata), uart1_tx_buffer);
     bzero (entry, sizeof (struct cache_entry));
 }
 
-long millis()
+static unsigned long current_time_ms = 0;
+
+static inline unsigned long millis()
 {
-    return system_get_time()/1000;
+    return current_time_ms;
 }
 
-void send_cached (uint8 *addr, unsigned rssi)
+void ms_tick (void *arg)
+{
+    current_time_ms += 100;
+}
+
+void send_or_cache (uint8 *addr, unsigned rssi)
 {
     unsigned long oldest_time = ~0UL;
-    long now = millis();
+    unsigned long now = millis();
     int i, oldest_index;
 
 #ifdef XM_PREFIX
@@ -83,10 +79,22 @@ void send_cached (uint8 *addr, unsigned rssi)
 
     for (i = 0; i < MAX_CACHE_ENTRIES; i++)
     {
+        // Invalid entry
+        if (!cache[i].data.count)
+        {
+            oldest_time = 0;
+            oldest_index = i;
+            continue;
+        }
+
         // Send and remove old cache entries
-        if (cache[i].insert_time + MAX_CACHE_AGE_MS < now)
+        //os_printf ("Checking age: %lu + %lu > %lu\n", cache[i].insert_time, MAX_CACHE_AGE_MS, now);
+        if ((cache[i].insert_time + MAX_CACHE_AGE_MS) < now)
         {
             send_packet (&cache[i], now);
+            oldest_time = 0;
+            oldest_index = i;
+            continue;
         }
 
         // Find oldest entry, if packet was sent above, then insert_time is 0
@@ -96,25 +104,27 @@ void send_cached (uint8 *addr, unsigned rssi)
             oldest_time = cache[i].insert_time;
             oldest_index = i;
         }
+    }
 
-        // Compare cache entry
+
+    // Compare cache entry
+    for (i = 0; i < MAX_CACHE_ENTRIES; i++)
+    {
         if (memcmp (addr, cache[i].data.addr, 6) == 0)
         {
             cache[i].accumulated_rssi += rssi;
             cache[i].data.count++;
             return;
         }
-
     }
 
-    // Not found, send oldest entry
-    if (oldest_time > 0)
+    // Not found, send oldest entry if still valid
+    if (cache[oldest_index].data.count)
     {
         send_packet (&cache[oldest_index], now);
     }
 
     // Add to cache
-    cache[oldest_index].valid = 1;
     memcpy (&cache[oldest_index].data.addr, addr, 6);
     cache[oldest_index].insert_time = now;
     cache[oldest_index].accumulated_rssi = rssi;
@@ -141,22 +151,6 @@ int next_channel_index_from_index (int index)
 void hop_channel(void *arg)
 {
     int ChannelIndex = (wifi_get_channel() - 1);
-
-#ifdef DEBUG
-    int i, sum = 0, sum1611 = 0;
-    if (++iters > CHANNEL_HOPS_TILL_DEBUG_OUTPUT)
-    {
-        for (i = 0; i < MAX_CHANNELS; i++)
-        {
-            sum += cs[i];
-            os_printf(" %d, %4.4d", i + 1, cs[i]);
-        }
-        sum1611 = cs[0] + cs[5] + cs[10];
-        os_printf("\n (main=%d, total=%d)\n", sum1611, sum);
-        init_stats();
-    }
-#endif // DEBUG
-
     wifi_set_channel(next_channel_index_from_index (ChannelIndex) + 1);
 }
 
@@ -186,7 +180,6 @@ void update_and_send (uint8 *buf, uint16 len, uint8 *addr3, signed rssi)
     uint8 *sa, *da;
     int type;
     int subtype;
-    int result;
 
     uint8 frame_control0 = buf[0];
     subtype = (frame_control0 >> 4) & 0xf;
@@ -254,33 +247,18 @@ void update_and_send (uint8 *buf, uint16 len, uint8 *addr3, signed rssi)
 
     if (dir == DIR_UP)
     {
-        send_cached (sa, rssi);
+        send_or_cache (sa, rssi);
     }
 
     if (dir == DIR_DOWN)
     {
-        send_cached (da, rssi);
+        send_or_cache (da, rssi);
     }
-
-#ifdef DEBUG
-    if (result)
-    {
-        os_printf (" %1.1x.%2.2x len:%3.0d fd:%1.1d td:%1.1d [%1.1d]", type, subtype, len, from_ds, to_ds, result);
-        printmac (sa, 0);
-        os_printf (" => ");
-        printmac (da, 0);
-        os_printf ("\n");
-    }
-
-    if (from_ds == 0 && to_ds == 0 && type == 2)
-    {
-        hexdump (buf, len);
-    }
-#endif // DEBUG
 }
 
 void dissect_buffer (uint8 *buf, uint16 length)
 {
+
     if (length == 12)
     {
         // This is just an RxControl structure which has no useful information for us. Ignore it.
@@ -340,7 +318,7 @@ void ICACHE_FLASH_ATTR
 sniffer_init_done() {
 
 #ifdef DEBUG
-    os_printf("Enter: sniffer_init_done");
+    os_printf("Enter: sniffer_init_done\n");
 #endif // DEBUG
 
     wifi_station_set_auto_connect(false); // do not connect automatically
@@ -353,8 +331,7 @@ sniffer_init_done() {
     wifi_set_channel(1);
 
 #ifdef DEBUG
-    init_stats();
-    os_printf("done.\n");
+    os_printf("OK.\n");
 #endif // DEBUG
 }
 
@@ -370,4 +347,8 @@ user_init()
     os_timer_disarm(&channelHop_timer);
     os_timer_setfn(&channelHop_timer, (os_timer_func_t *) hop_channel, NULL);
     os_timer_arm(&channelHop_timer, CHANNEL_HOP_INTERVAL_MS, 1);
+
+    os_timer_disarm(&ms_timer);
+    os_timer_setfn(&ms_timer, (os_timer_func_t *) ms_tick, NULL);
+    os_timer_arm(&ms_timer, 100, 1);
 }
