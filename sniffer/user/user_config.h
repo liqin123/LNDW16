@@ -7,6 +7,9 @@
 #define MAIN_CHANNELS 1
 #define CHANNEL_HOP_INTERVAL_MS 333
 
+// Use a static channel instead of hopping
+#define STATIC_CHANNEL 11
+
 // Debug controls
 #define DEBUG
 #define CHANNEL_HOPS_TILL_DEBUG_OUTPUT 9

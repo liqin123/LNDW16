@@ -19,8 +19,11 @@ os_event_t    user_procTaskQueue[user_procTaskQueueLen];
 				    buf[i+3], buf[i+4], buf[i+5])
 
 static unsigned int packet_count = 0;
-static volatile os_timer_t channelHop_timer;
 static volatile os_timer_t ms_timer;
+
+#ifndef STATIC_CHANNEL
+static volatile os_timer_t channelHop_timer;
+#endif // STATIC_CHANNEL
 
 static void loop(os_event_t *events);
 static void promisc_cb(uint8 *buf, uint16 len);
@@ -142,6 +145,7 @@ void send_or_cache (uint8 *addr, uint8 dir, unsigned rssi)
     return;
 }
 
+#ifndef STATIC_CHANNEL
 int next_channel_index_from_index (int index)
 {
 #ifdef MAIN_CHANNELS
@@ -162,6 +166,7 @@ void hop_channel(void *arg)
     int ChannelIndex = (wifi_get_channel() - 1);
     wifi_set_channel(next_channel_index_from_index (ChannelIndex) + 1);
 }
+#endif // STATIC_CHANNEL
 
 #ifdef DEBUG
 void hexdump (uint8 *buf, uint16 len)
@@ -337,7 +342,10 @@ sniffer_init_done() {
     wifi_promiscuous_enable(true);
 
     cache_init();
-    wifi_set_channel(1);
+
+#ifdef STATIC_CHANNEL
+    wifi_set_channel(STATIC_CHANNEL - 1);
+#endif // STATIC_CHANNEL
 
 #ifdef DEBUG
     os_printf("OK.\n");
@@ -353,9 +361,11 @@ user_init()
     system_init_done_cb(sniffer_init_done);
     system_set_os_print(true);
     
+#ifndef STATIC_CHANNEL
     os_timer_disarm(&channelHop_timer);
     os_timer_setfn(&channelHop_timer, (os_timer_func_t *) hop_channel, NULL);
     os_timer_arm(&channelHop_timer, CHANNEL_HOP_INTERVAL_MS, 1);
+#endif // STATIC_CHANNEL
 
     os_timer_disarm(&ms_timer);
     os_timer_setfn(&ms_timer, (os_timer_func_t *) ms_tick, NULL);
