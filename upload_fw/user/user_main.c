@@ -247,16 +247,11 @@ void send_datagram (uint8 *msg, uint8 len) {
             }
     }
 
-    uint8 *buffer_with_prefix = (uint8*)os_malloc(len + 13);
-    uint8 buffer_offset = 13; 
-    uint8 original_mac_offset = 6;
-    uint8 id_offset = 12;
-    memcpy(buffer_with_prefix, ap_bssid, MAC_SIZE);
-    memcpy(buffer_with_prefix+original_mac_offset, original_mac_addr, MAC_SIZE);
-    buffer_with_prefix[id_offset] = DEVID;
-    memcpy(buffer_with_prefix+buffer_offset, msg, len);
+    uint8 *buffer = (uint8*)os_malloc(len + 1);
+    buffer[0] = DEVID;
+    memcpy (buffer + 1, msg, len);
     
-    switch(espconn_send(&conn, buffer_with_prefix, len + buffer_offset)) {
+    switch(espconn_send(&conn, buffer, len + 1)) {
         case ESPCONN_ARG:
             {
                 os_printf("_send: invalid argument\n");
@@ -271,7 +266,7 @@ void send_datagram (uint8 *msg, uint8 len) {
 
     os_printf ("Sent datagram #%d\n", ++datagram_count);
     espconn_delete (&conn);
-    os_free (buffer_with_prefix); 
+    os_free (buffer); 
 }
 
 void //ICACHE_FLASH_ATTR
@@ -368,7 +363,7 @@ char ssid[32] = SSID;
 void ICACHE_FLASH_ATTR
 user_init()
 {
-    uart_init(BIT_RATE_460800, BIT_RATE_460800);
+    uart_init(BIT_RATE_115200, BIT_RATE_115200);
     system_set_os_print(true);
     system_init_done_cb(initDoneCb);
 }
