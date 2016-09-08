@@ -44,11 +44,13 @@ void cache_init (void)
 void send_packet (struct cache_entry *entry, unsigned long now)
 {
     entry->data.age  = now - entry->insert_time;
-    entry->data.rssi = entry->accumulated_rssi / entry->data.count;
+    entry->data.rssi_min = entry->minimum_rssi;
+    entry->data.rssi_max = entry->maximum_rssi;
+    entry->data.rssi_avg = entry->accumulated_rssi / entry->data.count;
 
     os_printf ("Sending packet #%d", ++packet_count);
     printmac (entry->data.addr, 0);
-    os_printf (" flags=%d, age=%lu, count=%d, mean rssi=%d\n", entry->data.flags, entry->data.age, entry->data.count, entry->data.rssi);
+    os_printf (" flags=%d, age=%lu, count=%d, avg rssi=%d\n", entry->data.flags, entry->data.age, entry->data.count, entry->data.rssi_avg);
 
     uart_codec_send_packet ((const void *)&entry->data, sizeof (struct metadata), uart1_tx_buffer);
     bzero (entry, sizeof (struct cache_entry));
@@ -125,6 +127,16 @@ void send_or_cache (uint8 *addr, uint8 dir, unsigned rssi)
         {
             cache[i].accumulated_rssi += rssi;
             cache[i].data.count++;
+
+            if (rssi < cache[i].minimum_rssi)
+            {
+                cache[i].minimum_rssi = rssi;
+            }
+
+            if (rssi > cache[i].maximum_rssi)
+            {
+                cache[i].maximum_rssi = rssi;
+            }
             return;
         }
     }
@@ -139,6 +151,8 @@ void send_or_cache (uint8 *addr, uint8 dir, unsigned rssi)
     cache[oldest_index].data.flags = dir;
     memcpy (&cache[oldest_index].data.addr, addr, 6);
     cache[oldest_index].insert_time = now;
+    cache[oldest_index].minimum_rssi     = rssi;
+    cache[oldest_index].maximum_rssi     = rssi;
     cache[oldest_index].accumulated_rssi = rssi;
     cache[oldest_index].data.count = 1;
 

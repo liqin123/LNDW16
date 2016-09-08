@@ -59,13 +59,17 @@ struct metadata
 {
     uint8  flags;
     uint8  addr[6];
-    signed char rssi;
+    signed char rssi_min;
+    signed char rssi_max;
+    signed char rssi_avg;
     uint16 count;
     uint16 age;
 };
 
 struct cache_entry
 {
+    long int minimum_rssi;
+    long int maximum_rssi;
     long int accumulated_rssi;
     unsigned long insert_time;
     struct metadata data;
