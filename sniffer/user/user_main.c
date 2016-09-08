@@ -45,7 +45,7 @@ void send_packet (struct cache_entry *entry, unsigned long now)
 
     os_printf ("Sending packet #%d", ++packet_count);
     printmac (entry->data.addr, 0);
-    os_printf (" age=%lu, count=%d, mean rssi=%d\n", entry->data.age, entry->data.count, entry->data.rssi);
+    os_printf (" flags=%d, age=%lu, count=%d, mean rssi=%d\n", entry->data.flags, entry->data.age, entry->data.count, entry->data.rssi);
 
     uart_codec_send_packet ((const void *)&entry->data, sizeof (struct metadata), uart1_tx_buffer);
     bzero (entry, sizeof (struct cache_entry));
@@ -63,7 +63,7 @@ void ms_tick (void *arg)
     current_time_ms += 100;
 }
 
-void send_or_cache (uint8 *addr, unsigned rssi)
+void send_or_cache (uint8 *addr, uint8 dir, unsigned rssi)
 {
     unsigned long oldest_time = ~0UL;
     unsigned long now = millis();
@@ -76,6 +76,14 @@ void send_or_cache (uint8 *addr, unsigned rssi)
         return;
     }
 #endif // XM_PREFIX
+
+#ifdef FILTER_BROADCASTS
+    if (memcmp (addr, "\xff\xff\xff\xff\xff\xff", 6) == 0)
+    {
+        // Broadcast, ignore.
+        return;
+    }
+#endif // FILTER_BROADCASTS
 
     for (i = 0; i < MAX_CACHE_ENTRIES; i++)
     {
@@ -110,7 +118,7 @@ void send_or_cache (uint8 *addr, unsigned rssi)
     // Compare cache entry
     for (i = 0; i < MAX_CACHE_ENTRIES; i++)
     {
-        if (memcmp (addr, cache[i].data.addr, 6) == 0)
+        if ((memcmp (addr, cache[i].data.addr, 6) == 0) && (cache[i].data.flags == dir))
         {
             cache[i].accumulated_rssi += rssi;
             cache[i].data.count++;
@@ -125,6 +133,7 @@ void send_or_cache (uint8 *addr, unsigned rssi)
     }
 
     // Add to cache
+    cache[oldest_index].data.flags = dir;
     memcpy (&cache[oldest_index].data.addr, addr, 6);
     cache[oldest_index].insert_time = now;
     cache[oldest_index].accumulated_rssi = rssi;
@@ -172,7 +181,7 @@ void hexdump (uint8 *buf, uint16 len)
 #define ADDR2(buf) (buf + 10)
 #define ADDR3(buf) (buf + 16)
 
-enum { DIR_UNKNOWN, DIR_UP, DIR_DOWN };
+enum { DIR_UNKNOWN = 0, DIR_UP = 1, DIR_DOWN = 2};
 
 void update_and_send (uint8 *buf, uint16 len, uint8 *addr3, signed rssi)
 {
@@ -247,12 +256,12 @@ void update_and_send (uint8 *buf, uint16 len, uint8 *addr3, signed rssi)
 
     if (dir == DIR_UP)
     {
-        send_or_cache (sa, rssi);
+        send_or_cache (sa, dir, rssi);
     }
 
     if (dir == DIR_DOWN)
     {
-        send_or_cache (da, rssi);
+        send_or_cache (da, dir, rssi);
     }
 }
 

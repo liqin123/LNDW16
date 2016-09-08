@@ -57,6 +57,7 @@ struct sniffer_buf2
 
 struct metadata
 {
+    uint8  flags;
     uint8  addr[6];
     signed char rssi;
     uint16 count;

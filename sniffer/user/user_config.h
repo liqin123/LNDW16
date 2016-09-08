@@ -11,6 +11,9 @@
 #define DEBUG
 #define CHANNEL_HOPS_TILL_DEBUG_OUTPUT 9
 
+// Filter controls
+#define FILTER_BROADCASTS 1
+
 // My Samsung tablet (E0:CB:EE:A9:E8:D7)
 //#define XM_PREFIX     "\xe0\xcb\xee"
 //#define XM_PREFIX_LEN 3
